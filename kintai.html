@@ -290,34 +290,24 @@ async function initMsal(cfg) {
   msalInstance = new msal.PublicClientApplication(msalConfig);
   // initialize not needed for v2.x
   // リダイレクト後の処理
-  await msalInstance.handleRedirectPromise();
+  const redirectResult = await msalInstance.handleRedirectPromise();
+  if (redirectResult) { currentAccount = redirectResult.account; }
 }
 
 async function signIn() {
-  const loginRequest = { scopes: GRAPH_SCOPES };
-  try {
-    await msalInstance.loginPopup(loginRequest);
-  } catch(e) {
-    if (e.errorCode === 'popup_window_error' || e.errorCode === 'empty_window_error') {
-      await msalInstance.loginRedirect(loginRequest);
-    } else {
-      throw e;
-    }
-  }
+  await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
 }
 
 function signOut() {
   if (!confirm('ログアウトしますか？')) return;
-  msalInstance.logoutPopup({ account: currentAccount }).catch(() => {
-    msalInstance.logoutRedirect({ account: currentAccount });
-  });
+  msalInstance.logoutRedirect({ account: currentAccount });
 }
 
 async function getAccessToken() {
   const accounts = msalInstance.getAllAccounts();
   if (!accounts.length) {
-    await signIn();
-    return getAccessToken();
+    await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    return;
   }
   currentAccount = accounts[0];
   const request = { scopes: GRAPH_SCOPES, account: currentAccount };
@@ -325,8 +315,7 @@ async function getAccessToken() {
     const res = await msalInstance.acquireTokenSilent(request);
     return res.accessToken;
   } catch(e) {
-    const res = await msalInstance.acquireTokenPopup(request);
-    return res.accessToken;
+    await msalInstance.acquireTokenRedirect(request);
   }
 }
 
