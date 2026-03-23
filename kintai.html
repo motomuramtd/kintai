@@ -367,15 +367,41 @@ async function initSharePoint(cfg) {
   const site = await gGet(`/sites/${cfg.spHost}:${cfg.sitePath}`);
   siteId = site.id;
 
-  // 社員マスタファイル
-  const masterItem = await gGet(`/sites/${siteId}/drive/root:/${cfg.masterPath}`);
-  masterItemId = masterItem.id;
-  masterDriveId = masterItem.parentReference.driveId;
+  // ドキュメントライブラリ名からdriveIdを解決してファイルを取得
+  async function resolveFile(filePath) {
+    const parts = filePath.split('/');
+    const libraryName = parts[0];
+    const subPath = parts.slice(1).join('/');
 
-  // 勤怠データファイル
-  const dataItem = await gGet(`/sites/${siteId}/drive/root:/${cfg.dataPath}`);
-  dataItemId = dataItem.id;
-  dataDriveId = dataItem.parentReference.driveId;
+    // サイトの全ドライブ（ライブラリ）一覧を取得
+    const { value: drives } = await gGet(`/sites/${siteId}/drives`);
+
+    // ライブラリ名で一致するドライブを探す
+    const drive = drives.find(d =>
+      d.name === libraryName ||
+      d.webUrl.split('/').pop() === libraryName
+    );
+
+    if (drive) {
+      // 見つかったライブラリ内のファイルを取得
+      const item = await gGet(`/drives/${drive.id}/root:/${subPath}`);
+      return { driveId: drive.id, itemId: item.id };
+    } else {
+      // デフォルトドライブで試みる（ライブラリ名がフォルダの場合）
+      const item = await gGet(`/sites/${siteId}/drive/root:/${filePath}`);
+      return { driveId: item.parentReference.driveId, itemId: item.id };
+    }
+  }
+
+  const [master, data] = await Promise.all([
+    resolveFile(cfg.masterPath),
+    resolveFile(cfg.dataPath)
+  ]);
+
+  masterDriveId = master.driveId;
+  masterItemId  = master.itemId;
+  dataDriveId   = data.driveId;
+  dataItemId    = data.itemId;
 }
 
 // 社員マスタ読み込み
