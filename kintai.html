@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>勤怠管理システム</title>
-  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/dist/msal-browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;background:#1a1a2e;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column}
@@ -288,7 +288,7 @@ async function initMsal(cfg) {
     cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
   };
   msalInstance = new msal.PublicClientApplication(msalConfig);
-  await msalInstance.initialize();
+  // initialize not needed for v2.x
   // リダイレクト後の処理
   await msalInstance.handleRedirectPromise();
 }
