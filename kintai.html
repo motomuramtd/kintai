@@ -118,6 +118,7 @@
     /* ===== 管理パネル ===== */
     .admin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:300;flex-direction:column}
     .admin-overlay.show{display:flex}
+    #edit-modal{z-index:400}
     .admin-header{background:#0f3460;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .admin-header h2{font-size:18px;white-space:nowrap}
     .admin-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -609,6 +610,8 @@ async function rewriteDayRecords(empId, dateStr, newLogs) {
 let employees = [];
 let todayRecords = {};    // { empId: [{type, time}] }
 let pendingCards = new Set();
+let recentWrites = {};    // { empId: timestamp } 書き込み完了後の同期ガード
+const WRITE_GUARD_MS = 30000; // 書き込み後30秒は同期で上書きしない
 let selectedEmpId = null;
 
 function todayStr() {
@@ -737,6 +740,7 @@ async function registerAction(empId, type, timeStr) {
 
   try {
     await writeRecord(empId, type, time);
+    recentWrites[empId] = Date.now(); // 書き込み成功→同期ガード開始
   } catch(e) {
     todayRecords[empId].pop();
     showToast(`⚠️ 保存に失敗しました（${emp.name}）`, '#e74c3c');
@@ -1064,9 +1068,11 @@ async function silentRefresh() {
   silentRefreshing = true;
   try {
     const newRecords = await loadTodayRecords();
-    // 書き込み待ち中でないカードのみ更新
+    // 書き込み待ち中、または書き込み後30秒以内のカードは上書きしない
+    const now = Date.now();
     employees.forEach(emp => {
-      if (!pendingCards.has(emp.id)) {
+      const guard = recentWrites[emp.id] && (now - recentWrites[emp.id] < WRITE_GUARD_MS);
+      if (!pendingCards.has(emp.id) && !guard) {
         todayRecords[emp.id] = newRecords[emp.id] || [];
       }
     });
