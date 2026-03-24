@@ -35,36 +35,38 @@
 
     /* ===== ヘッダー ===== */
     #main-screen{flex:1;display:none;flex-direction:column;overflow:hidden}
-    header{background:#16213e;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0f3460;flex-shrink:0}
-    header h1{font-size:20px;font-weight:700;color:#e94560;letter-spacing:2px}
-    #clock{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
-    #date-display{font-size:14px;color:#aaa;text-align:right}
-    .header-actions{display:flex;gap:10px;align-items:center}
-    .hdr-btn{background:#0f3460;color:#aaa;border:1px solid #1a4a7a;padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer}
+    header{background:#16213e;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0f3460;flex-shrink:0;gap:12px}
+    header h1{font-size:18px;font-weight:700;color:#e94560;letter-spacing:2px;white-space:nowrap}
+    #clock{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+    #date-display{font-size:13px;color:#aaa;text-align:right}
+    #sync-status{font-size:11px;color:#27ae60;margin-top:2px;text-align:right}
+    .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .hdr-btn{background:#0f3460;color:#aaa;border:1px solid #1a4a7a;padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
     .hdr-btn:hover{background:#1a4a7a;color:#fff}
     .hdr-btn.red{background:#4a1a1a;border-color:#8a2a2a;color:#ff9999}
     .hdr-btn.red:hover{background:#6a2a2a}
 
     /* ===== 凡例・集計 ===== */
-    .legend{display:flex;gap:20px;padding:8px 20px;background:#16213e;flex-shrink:0;align-items:center;font-size:13px;color:#ccc;border-bottom:1px solid #0f3460;flex-wrap:wrap}
+    .legend{display:flex;gap:16px;padding:6px 16px;background:#16213e;flex-shrink:0;align-items:center;font-size:13px;color:#ccc;border-bottom:1px solid #0f3460;flex-wrap:wrap}
     .legend-item{display:flex;align-items:center;gap:6px}
-    .legend-dot{width:12px;height:12px;border-radius:50%}
+    .legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
     .dot-none{background:#555}
     .dot-in{background:#27ae60}
     .dot-out{background:#f39c12}
     .dot-done{background:#2c2c54;border:1px solid #555}
-    .stats{margin-left:auto;display:flex;gap:16px;font-size:14px}
-    .stat-item{color:#aaa}
+    .stats{margin-left:auto;display:flex;gap:14px;font-size:14px}
+    .stat-item{color:#aaa;white-space:nowrap}
     .stat-item span{color:#fff;font-weight:700}
 
     /* ===== グリッド ===== */
-    #grid-container{flex:1;overflow-y:auto;padding:16px}
+    #grid-container{flex:1;overflow-y:auto;padding:12px}
     #employee-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;max-width:1400px;margin:0 auto}
 
     /* ===== 社員カード ===== */
     .emp-card{border-radius:12px;padding:12px 8px 10px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent}
     .emp-card:active{transform:scale(0.93)}
     .emp-card.pending::after{content:'⏳';position:absolute;top:4px;right:6px;font-size:14px}
+    .emp-card.out-limit::before{content:'外出上限';position:absolute;top:3px;left:4px;font-size:9px;background:rgba(231,76,60,.7);color:#fff;border-radius:4px;padding:1px 4px}
     .status-none{background:#2c2c54;border-color:#3d3d7a}
     .status-none .emp-name{color:#ccc}
     .status-in{background:linear-gradient(135deg,#1d6b3e,#27ae60);border-color:#2ecc71;box-shadow:0 0 12px rgba(39,174,96,.4)}
@@ -78,18 +80,36 @@
     .status-badge{font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(0,0,0,.25);display:inline-block}
     .emp-time{font-size:11px;color:rgba(255,255,255,.7);margin-top:4px;font-variant-numeric:tabular-nums}
 
-    /* ===== モーダル ===== */
+    /* ===== モーダル共通 ===== */
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center}
     .modal-overlay.show{display:flex}
-    .modal{background:#16213e;border-radius:20px;padding:28px 32px;text-align:center;min-width:320px;border:1px solid #0f3460;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+    .modal{background:#16213e;border-radius:20px;padding:28px 32px;text-align:center;min-width:320px;max-width:90vw;border:1px solid #0f3460;box-shadow:0 20px 60px rgba(0,0,0,.6)}
     .modal h2{font-size:22px;margin-bottom:6px}
     .modal .modal-status{font-size:14px;color:#aaa;margin-bottom:24px}
     .modal-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
     .modal-btn{padding:14px 28px;border:none;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;min-width:120px;transition:transform .1s}
     .modal-btn:active{transform:scale(.95)}
+    .modal-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
     .btn-go-out{background:#f39c12;color:#fff}
     .btn-leave{background:#e74c3c;color:#fff}
     .btn-cancel{background:#444;color:#ccc}
+
+    /* ===== 修正モーダル ===== */
+    #edit-modal .modal{min-width:360px;max-width:95vw;text-align:left}
+    .edit-log-list{margin:12px 0;max-height:260px;overflow-y:auto}
+    .edit-log-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:#0f3460;margin-bottom:6px}
+    .edit-log-item .log-type{font-weight:700;min-width:48px;font-size:14px}
+    .edit-log-item .log-time-input{background:#1a4a7a;border:1px solid #2a5a9a;color:#fff;padding:6px 10px;border-radius:6px;font-size:14px;width:110px;font-variant-numeric:tabular-nums}
+    .edit-log-item .del-btn{margin-left:auto;background:#4a1a1a;border:none;color:#ff9999;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;flex-shrink:0}
+    .edit-add-row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+    .edit-add-row select{background:#0f3460;border:1px solid #1a4a7a;color:#fff;padding:8px 10px;border-radius:8px;font-size:14px;flex:1;min-width:80px}
+    .edit-add-row input[type=time]{background:#0f3460;border:1px solid #1a4a7a;color:#fff;padding:8px 10px;border-radius:8px;font-size:14px;flex:1;min-width:100px}
+    .edit-add-btn{background:#3498db;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;white-space:nowrap}
+    .edit-save-btn{width:100%;margin-top:16px;padding:12px;background:#27ae60;border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
+    .edit-save-btn:hover{background:#219a52}
+    .edit-title{font-size:18px;font-weight:700;margin-bottom:4px}
+    .edit-subtitle{font-size:13px;color:#aaa;margin-bottom:12px}
+    .edit-section-label{font-size:12px;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
 
     /* ===== トースト ===== */
     #toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(80px);background:#27ae60;color:#fff;padding:14px 28px;border-radius:40px;font-size:16px;font-weight:700;z-index:200;transition:transform .3s ease,opacity .3s ease;opacity:0;white-space:nowrap}
@@ -98,25 +118,27 @@
     /* ===== 管理パネル ===== */
     .admin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:300;flex-direction:column}
     .admin-overlay.show{display:flex}
-    .admin-header{background:#0f3460;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .admin-header{background:#0f3460;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .admin-header h2{font-size:18px;white-space:nowrap}
     .admin-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .admin-tools input[type="date"]{background:#1a4a7a;border:1px solid #2a5a8a;color:#fff;padding:8px 12px;border-radius:8px;font-size:14px}
-    .export-btn{background:#27ae60;border:none;color:#fff;padding:8px 16px;border-radius:8px;font-size:14px;cursor:pointer}
+    .export-btn{background:#27ae60;border:none;color:#fff;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
     .export-btn:hover{background:#219a52}
-    .admin-close{background:#e94560;border:none;color:#fff;padding:8px 16px;border-radius:8px;font-size:14px;cursor:pointer}
-    #admin-table-wrap{flex:1;overflow-y:auto;padding:16px 24px}
-    #admin-table{width:100%;border-collapse:collapse;font-size:14px}
-    #admin-table th{background:#0f3460;padding:10px 12px;text-align:left;position:sticky;top:0}
-    #admin-table td{padding:9px 12px;border-bottom:1px solid #1a1a3a}
+    .admin-close{background:#e94560;border:none;color:#fff;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
+    #admin-table-wrap{flex:1;overflow-y:auto;padding:12px 20px}
+    #admin-table{width:100%;border-collapse:collapse;font-size:13px}
+    #admin-table th{background:#0f3460;padding:9px 10px;text-align:left;position:sticky;top:0;white-space:nowrap}
+    #admin-table td{padding:8px 10px;border-bottom:1px solid #1a1a3a;vertical-align:middle}
     #admin-table tr:hover td{background:rgba(255,255,255,.04)}
     .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700}
     .tag-in{background:#1d6b3e;color:#7fffb0}
     .tag-out{background:#8e5b00;color:#ffd580}
     .tag-done{background:#4a1a1a;color:#ff9999}
+    .edit-row-btn{background:#1a4a7a;border:1px solid #2a5a8a;color:#adf;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;white-space:nowrap}
+    .edit-row-btn:hover{background:#2a5a8a}
 
     /* エラー表示 */
-    .error-banner{background:#4a1a1a;color:#ff9999;padding:10px 20px;font-size:14px;display:none;flex-shrink:0}
+    .error-banner{background:#4a1a1a;color:#ff9999;padding:10px 16px;font-size:14px;display:none;flex-shrink:0}
 
     ::-webkit-scrollbar{width:6px;height:6px}
     ::-webkit-scrollbar-track{background:#111}
@@ -177,9 +199,10 @@
     <div style="text-align:center">
       <div id="clock">00:00:00</div>
     </div>
-    <div class="header-right">
-      <div id="date-display" style="font-size:14px;color:#aaa;text-align:right;margin-bottom:4px"></div>
-      <div class="header-actions">
+    <div>
+      <div id="date-display" style="font-size:13px;color:#aaa;text-align:right;margin-bottom:2px"></div>
+      <div id="sync-status">🔄 同期待機中</div>
+      <div class="header-actions" style="margin-top:6px">
         <button class="hdr-btn" onclick="refreshData()">🔄 更新</button>
         <button class="hdr-btn" onclick="openAdmin()">📋 管理</button>
         <button class="hdr-btn" onclick="openSettings()">⚙️</button>
@@ -191,9 +214,9 @@
   <div id="error-banner" class="error-banner"></div>
 
   <div class="legend">
-    <div class="legend-item"><div class="legend-dot dot-none"></div>未出勤（1タップで出勤）</div>
-    <div class="legend-item"><div class="legend-dot dot-in"></div>出勤中（1タップで外出/退勤）</div>
-    <div class="legend-item"><div class="legend-dot dot-out"></div>外出中（1タップで戻り）</div>
+    <div class="legend-item"><div class="legend-dot dot-none"></div>未出勤（タップで出勤）</div>
+    <div class="legend-item"><div class="legend-dot dot-in"></div>出勤中（タップで外出/退勤）</div>
+    <div class="legend-item"><div class="legend-dot dot-out"></div>外出中（タップで戻り）</div>
     <div class="legend-item"><div class="legend-dot dot-done"></div>退勤済</div>
     <div class="stats">
       <div class="stat-item">出勤中: <span id="cnt-in">0</span></div>
@@ -214,9 +237,12 @@
     <h2 id="modal-name"></h2>
     <div class="modal-status" id="modal-status"></div>
     <div class="modal-buttons">
-      <button class="modal-btn btn-go-out" onclick="doAction('外出')">🚶 外出</button>
+      <button class="modal-btn btn-go-out" id="btn-go-out" onclick="doAction('外出')">🚶 外出</button>
       <button class="modal-btn btn-leave"  onclick="doAction('退勤')">🏠 退勤</button>
       <button class="modal-btn btn-cancel" onclick="closeModal()">✕ キャンセル</button>
+    </div>
+    <div id="modal-out-note" style="font-size:12px;color:#f39c12;margin-top:10px;display:none">
+      ⚠️ 外出は1日2回までです（上限に達しました）
     </div>
   </div>
 </div>
@@ -229,6 +255,31 @@
     <div id="done-modal-log" style="text-align:left;font-size:14px;line-height:2.2;min-width:240px"></div>
     <div style="margin-top:20px">
       <button class="modal-btn btn-cancel" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 修正モーダル ===== -->
+<div class="modal-overlay" id="edit-modal" onclick="closeEditModal(event)">
+  <div class="modal" style="min-width:340px;max-width:95vw;text-align:left;padding:22px 24px">
+    <div class="edit-title" id="edit-modal-title">📝 記録修正</div>
+    <div class="edit-subtitle" id="edit-modal-date"></div>
+    <div class="edit-section-label">現在の記録（削除・時刻修正可）</div>
+    <div class="edit-log-list" id="edit-log-list"></div>
+    <div class="edit-section-label" style="margin-top:14px">記録を追加</div>
+    <div class="edit-add-row">
+      <select id="edit-add-type">
+        <option value="出勤">出勤</option>
+        <option value="外出">外出</option>
+        <option value="戻り">戻り</option>
+        <option value="退勤">退勤</option>
+      </select>
+      <input type="time" id="edit-add-time" step="60">
+      <button class="edit-add-btn" onclick="editAddRow()">＋ 追加</button>
+    </div>
+    <button class="edit-save-btn" onclick="saveEditRecords()">✅ 保存する</button>
+    <div style="margin-top:10px;text-align:center">
+      <button class="modal-btn btn-cancel" style="font-size:14px;padding:10px 24px" onclick="closeEditModal()">キャンセル</button>
     </div>
   </div>
 </div>
@@ -250,7 +301,10 @@
     <div id="admin-loading" style="text-align:center;padding:40px;color:#aaa">読み込み中...</div>
     <table id="admin-table" style="display:none">
       <thead>
-        <tr><th>社員ID</th><th>氏名</th><th>出勤</th><th>外出</th><th>戻り</th><th>退勤</th><th>実働時間</th><th>状態</th></tr>
+        <tr>
+          <th>社員ID</th><th>氏名</th><th>出勤</th><th>外出</th>
+          <th>戻り</th><th>退勤</th><th>実働時間</th><th>状態</th><th>修正</th>
+        </tr>
       </thead>
       <tbody id="admin-tbody"></tbody>
     </table>
@@ -288,8 +342,6 @@ async function initMsal(cfg) {
     cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
   };
   msalInstance = new msal.PublicClientApplication(msalConfig);
-  // initialize not needed for v2.x
-  // リダイレクト後の処理
   const redirectResult = await msalInstance.handleRedirectPromise();
   if (redirectResult) { currentAccount = redirectResult.account; }
 }
@@ -363,31 +415,22 @@ let siteId = null, masterDriveId = null, masterItemId = null;
 let dataDriveId = null, dataItemId = null;
 
 async function initSharePoint(cfg) {
-  // サイトID取得
   const site = await gGet(`/sites/${cfg.spHost}:${cfg.sitePath}`);
   siteId = site.id;
 
-  // ドキュメントライブラリ名からdriveIdを解決してファイルを取得
   async function resolveFile(filePath) {
     const parts = filePath.split('/');
     const libraryName = parts[0];
     const subPath = parts.slice(1).join('/');
-
-    // サイトの全ドライブ（ライブラリ）一覧を取得
     const { value: drives } = await gGet(`/sites/${siteId}/drives`);
-
-    // ライブラリ名で一致するドライブを探す
     const drive = drives.find(d =>
       d.name === libraryName ||
       d.webUrl.split('/').pop() === libraryName
     );
-
     if (drive) {
-      // 見つかったライブラリ内のファイルを取得
       const item = await gGet(`/drives/${drive.id}/root:/${subPath}`);
       return { driveId: drive.id, itemId: item.id };
     } else {
-      // デフォルトドライブで試みる（ライブラリ名がフォルダの場合）
       const item = await gGet(`/sites/${siteId}/drive/root:/${filePath}`);
       return { driveId: item.parentReference.driveId, itemId: item.id };
     }
@@ -397,18 +440,14 @@ async function initSharePoint(cfg) {
     resolveFile(cfg.masterPath),
     resolveFile(cfg.dataPath)
   ]);
-
-  masterDriveId = master.driveId;
-  masterItemId  = master.itemId;
-  dataDriveId   = data.driveId;
-  dataItemId    = data.itemId;
+  masterDriveId = master.driveId; masterItemId = master.itemId;
+  dataDriveId = data.driveId;     dataItemId = data.itemId;
 }
 
 // 社員マスタ読み込み
 async function loadEmployees() {
   const range = await gGet(`/drives/${masterDriveId}/items/${masterItemId}/workbook/worksheets('社員マスタ')/usedRange`);
   const rows = range.values || [];
-  // ヘッダー行スキップ（行0）
   return rows.slice(1)
     .filter(r => r[0] && r[1])
     .map(r => ({ id: String(r[0]).trim(), name: String(r[1]).trim() }));
@@ -417,7 +456,7 @@ async function loadEmployees() {
 // 今日の勤怠データ読み込み
 async function loadTodayRecords() {
   const today = todayStr();
-  const sheetName = today.slice(0, 7); // YYYY-MM
+  const sheetName = today.slice(0, 7);
   try {
     const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/usedRange`);
     const recs = {};
@@ -436,7 +475,7 @@ async function loadTodayRecords() {
   }
 }
 
-// 管理パネル用：指定日の勤怠データ読み込み
+// 指定日の勤怠データ読み込み（管理パネル用）
 async function loadRecordsByDate(dateStr) {
   const sheetName = dateStr.slice(0, 7);
   try {
@@ -461,9 +500,7 @@ async function ensureMonthSheet(sheetName) {
   try {
     await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')`);
   } catch(e) {
-    // シートを作成
     await gPost(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets/add`, { name: sheetName });
-    // ヘッダー書き込み
     await gPatch(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A1:E1')`, {
       values: [['日付', '社員ID', '氏名', '種別', '時刻']]
     });
@@ -473,11 +510,11 @@ async function ensureMonthSheet(sheetName) {
 // 書き込みを直列化するキュー
 let writeLock = Promise.resolve();
 
-async function writeRecord(empId, type) {
+// 通常の1件追記
+async function writeRecord(empId, type, timeStr) {
   const emp = employees.find(e => e.id === empId);
-  const now = new Date();
   const date = todayStr();
-  const time = now.toTimeString().slice(0, 8);
+  const time = timeStr || new Date().toTimeString().slice(0, 8);
   const sheetName = date.slice(0, 7);
 
   const doWrite = async () => {
@@ -493,6 +530,72 @@ async function writeRecord(empId, type) {
       `/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A${nextRow}:E${nextRow}')`,
       { values: [[date, empId, emp ? emp.name : empId, type, time]] }
     );
+  };
+
+  const p = writeLock.then(doWrite);
+  writeLock = p.catch(() => {});
+  return p;
+}
+
+// 指定社員・指定日のレコードを全書き直し（修正機能用）
+async function rewriteDayRecords(empId, dateStr, newLogs) {
+  const sheetName = dateStr.slice(0, 7);
+
+  const doWrite = async () => {
+    await ensureMonthSheet(sheetName);
+
+    // 現在のシート全データを取得
+    let allRows = [];
+    try {
+      const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/usedRange`);
+      allRows = (range.values || []).slice(1).filter(r => r[0] || r[1]);
+    } catch(e) { allRows = []; }
+
+    // 該当社員・該当日のレコードを除外
+    const filtered = allRows.filter(row => {
+      const d = String(row[0]).slice(0, 10);
+      const eid = String(row[1]);
+      return !(d === dateStr && eid === String(empId));
+    });
+
+    // 修正後のレコードを追加
+    const emp = employees.find(e => e.id === empId);
+    newLogs.forEach(l => {
+      filtered.push([dateStr, empId, emp ? emp.name : empId, l.type, l.time]);
+    });
+
+    // 時刻・日付順でソート
+    filtered.sort((a, b) => {
+      if (String(a[0]) < String(b[0])) return -1;
+      if (String(a[0]) > String(b[0])) return 1;
+      if (String(a[4]) < String(b[4])) return -1;
+      if (String(a[4]) > String(b[4])) return 1;
+      return 0;
+    });
+
+    // シートをクリア（既存データ行数分）
+    const clearRows = allRows.length + 1;
+    if (clearRows > 1) {
+      const emptyData = Array(clearRows).fill(null).map(() => ['', '', '', '', '']);
+      await gPatch(
+        `/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A1:E${clearRows}')`,
+        { values: emptyData }
+      );
+    }
+
+    // ヘッダー＋全データを書き直す
+    const writeData = [['日付', '社員ID', '氏名', '種別', '時刻'], ...filtered];
+    if (writeData.length > 1) {
+      await gPatch(
+        `/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A1:E${writeData.length}')`,
+        { values: writeData }
+      );
+    } else {
+      await gPatch(
+        `/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A1:E1')`,
+        { values: [['日付', '社員ID', '氏名', '種別', '時刻']] }
+      );
+    }
   };
 
   const p = writeLock.then(doWrite);
@@ -522,6 +625,12 @@ function getStatus(empId) {
   return 'none';
 }
 
+// 外出回数カウント（1日上限チェック用）
+function getOutCount(empId) {
+  const logs = todayRecords[empId] || [];
+  return logs.filter(l => l.type === '外出').length;
+}
+
 // ================================================================
 //  UI レンダリング
 // ================================================================
@@ -532,6 +641,7 @@ function renderGrid() {
 
   employees.forEach(emp => {
     const st = getStatus(emp.id);
+    const outCount = getOutCount(emp.id);
     if (st === 'in') cntIn++;
     else if (st === 'out') cntOut++;
     else if (st === 'done') cntDone++;
@@ -541,8 +651,11 @@ function renderGrid() {
     const last = logs.length ? logs[logs.length - 1] : null;
     const label = { none: '未出勤', in: '出勤中', out: '外出中', done: '退勤済' }[st];
 
+    // 出勤中かつ外出2回以上の場合はアイコン表示
+    const outLimitClass = (st === 'in' && outCount >= 2) ? ' out-limit' : '';
+
     const card = document.createElement('div');
-    card.className = `emp-card status-${st}${pendingCards.has(emp.id) ? ' pending' : ''}`;
+    card.className = `emp-card status-${st}${pendingCards.has(emp.id) ? ' pending' : ''}${outLimitClass}`;
     card.dataset.id = emp.id;
     card.innerHTML = `
       <div class="emp-id">${emp.id}</div>
@@ -564,7 +677,7 @@ function renderGrid() {
 //  タップ処理
 // ================================================================
 function onCardTap(empId) {
-  if (pendingCards.has(empId)) return; // 書き込み中は無視
+  if (pendingCards.has(empId)) return;
   const st = getStatus(empId);
   const emp = employees.find(e => e.id === empId);
   selectedEmpId = empId;
@@ -574,8 +687,22 @@ function onCardTap(empId) {
   } else if (st === 'in') {
     const logs = todayRecords[empId] || [];
     const inLog = [...logs].reverse().find(l => l.type === '出勤' || l.type === '戻り');
+    const outCount = getOutCount(empId);
+
     document.getElementById('modal-name').textContent = emp.name;
     document.getElementById('modal-status').textContent = `出勤中 ／ 出勤 ${inLog ? inLog.time : ''}`;
+
+    // 外出2回上限チェック
+    const btnOut = document.getElementById('btn-go-out');
+    const outNote = document.getElementById('modal-out-note');
+    if (outCount >= 2) {
+      btnOut.disabled = true;
+      outNote.style.display = 'block';
+    } else {
+      btnOut.disabled = false;
+      outNote.style.display = 'none';
+    }
+
     document.getElementById('action-modal').classList.add('show');
   } else if (st === 'out') {
     registerAction(empId, '戻り');
@@ -593,10 +720,10 @@ function doAction(type) {
   registerAction(selectedEmpId, type);
 }
 
-async function registerAction(empId, type) {
+async function registerAction(empId, type, timeStr) {
   const emp = employees.find(e => e.id === empId);
   const now = new Date();
-  const time = now.toTimeString().slice(0, 8);
+  const time = timeStr || now.toTimeString().slice(0, 8);
 
   // 楽観的UI更新
   if (!todayRecords[empId]) todayRecords[empId] = [];
@@ -609,9 +736,8 @@ async function registerAction(empId, type) {
   showToast(`${icons[type]} ${emp.name} さんが${type}しました`, colors[type]);
 
   try {
-    await writeRecord(empId, type);
+    await writeRecord(empId, type, time);
   } catch(e) {
-    // ロールバック
     todayRecords[empId].pop();
     showToast(`⚠️ 保存に失敗しました（${emp.name}）`, '#e74c3c');
     showError(`Excelへの書き込みに失敗: ${e.message}`);
@@ -631,6 +757,7 @@ function closeModal(e) {
 //  管理パネル
 // ================================================================
 let adminRecords = {};
+let adminCurrentDate = '';
 
 async function openAdmin() {
   document.getElementById('admin-date').value = todayStr();
@@ -642,12 +769,14 @@ function closeAdmin() {
 }
 
 async function renderAdminTable() {
-  const date = document.getElementById('admin-date').value || todayStr();
+  adminCurrentDate = document.getElementById('admin-date').value || todayStr();
   document.getElementById('admin-loading').style.display = 'block';
   document.getElementById('admin-table').style.display = 'none';
 
   try {
-    adminRecords = date === todayStr() ? todayRecords : await loadRecordsByDate(date);
+    adminRecords = adminCurrentDate === todayStr()
+      ? todayRecords
+      : await loadRecordsByDate(adminCurrentDate);
   } catch(e) {
     adminRecords = {};
   }
@@ -666,7 +795,7 @@ async function renderAdminTable() {
       return 'none';
     })();
 
-    const find  = t => logs.find(l => l.type === t)?.time ?? '—';
+    const find    = t => logs.find(l => l.type === t)?.time ?? '—';
     const findAll = t => logs.filter(l => l.type === t).map(l => l.time).join(' / ') || '—';
     const work = logs.length ? calcWorkTime(logs) : '—';
     const stTag = {
@@ -686,6 +815,7 @@ async function renderAdminTable() {
       <td>${find('退勤')}</td>
       <td>${work}</td>
       <td>${stTag}</td>
+      <td><button class="edit-row-btn" onclick="openEditModal('${emp.id}','${adminCurrentDate}')">✏️ 修正</button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -707,8 +837,8 @@ function calcWorkTime(logs) {
   return `${Math.floor(total/3600000)}時間${Math.floor((total%3600000)/60000)}分`;
 }
 function parseTimeMs(s) {
-  const [h,m,sec] = s.split(':').map(Number);
-  return (h*3600+m*60+sec)*1000;
+  const [h,m,sec] = (s||'00:00:00').split(':').map(Number);
+  return (h*3600+m*60+(sec||0))*1000;
 }
 
 // ================================================================
@@ -733,6 +863,98 @@ function exportCSV() {
 }
 
 // ================================================================
+//  修正モーダル
+// ================================================================
+let editEmpId = null;
+let editDate = null;
+let editLogs = [];  // [{type, time}]
+
+function openEditModal(empId, dateStr) {
+  editEmpId = empId;
+  editDate = dateStr;
+  const emp = employees.find(e => e.id === empId);
+
+  // 現在のログをコピー
+  editLogs = JSON.parse(JSON.stringify(adminRecords[empId] || []));
+
+  document.getElementById('edit-modal-title').textContent = `✏️ 記録修正：${emp ? emp.name : empId}`;
+  document.getElementById('edit-modal-date').textContent = `対象日：${dateStr}`;
+
+  // 現在時刻をデフォルト追加時刻に
+  const now = new Date();
+  document.getElementById('edit-add-time').value = now.toTimeString().slice(0, 5);
+
+  renderEditLogList();
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function renderEditLogList() {
+  const list = document.getElementById('edit-log-list');
+  list.innerHTML = '';
+  if (!editLogs.length) {
+    list.innerHTML = '<div style="color:#777;font-size:13px;padding:8px">記録なし</div>';
+    return;
+  }
+  editLogs.forEach((log, idx) => {
+    const colors = { '出勤': '#27ae60', '外出': '#f39c12', '戻り': '#3498db', '退勤': '#e74c3c' };
+    const item = document.createElement('div');
+    item.className = 'edit-log-item';
+    item.innerHTML = `
+      <span class="log-type" style="color:${colors[log.type]||'#fff'}">${log.type}</span>
+      <input type="time" class="log-time-input" value="${log.time.slice(0,5)}" step="60"
+        onchange="editLogs[${idx}].time=this.value+':00'">
+      <button class="del-btn" onclick="editDeleteRow(${idx})">🗑 削除</button>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function editDeleteRow(idx) {
+  editLogs.splice(idx, 1);
+  renderEditLogList();
+}
+
+function editAddRow() {
+  const type = document.getElementById('edit-add-type').value;
+  const timeVal = document.getElementById('edit-add-time').value;
+  if (!timeVal) { alert('時刻を入力してください'); return; }
+  editLogs.push({ type, time: timeVal + ':00' });
+  // 時刻順ソート
+  editLogs.sort((a, b) => a.time.localeCompare(b.time));
+  renderEditLogList();
+}
+
+async function saveEditRecords() {
+  const emp = employees.find(e => e.id === editEmpId);
+  if (!confirm(`${emp ? emp.name : editEmpId} さんの ${editDate} の記録を保存しますか？`)) return;
+
+  document.getElementById('edit-modal').classList.remove('show');
+  showToast('💾 修正データを保存中...', '#3498db');
+
+  try {
+    await rewriteDayRecords(editEmpId, editDate, editLogs);
+
+    // メモリ上のデータも更新
+    if (editDate === todayStr()) {
+      todayRecords[editEmpId] = JSON.parse(JSON.stringify(editLogs));
+      renderGrid();
+    }
+    adminRecords[editEmpId] = JSON.parse(JSON.stringify(editLogs));
+
+    showToast('✅ 修正を保存しました', '#27ae60');
+    await renderAdminTable();
+  } catch(e) {
+    showToast('⚠️ 保存に失敗しました', '#e74c3c');
+    showError('修正保存エラー: ' + e.message);
+  }
+}
+
+function closeEditModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('edit-modal').classList.remove('show');
+}
+
+// ================================================================
 //  トースト / エラー
 // ================================================================
 let toastTimer;
@@ -754,10 +976,10 @@ function showError(msg) {
 // ================================================================
 function openSettings() {
   const cfg = loadConfig() || {};
-  document.getElementById('cfg-client-id').value = cfg.clientId || '';
-  document.getElementById('cfg-tenant-id').value = cfg.tenantId || '';
-  document.getElementById('cfg-sp-host').value   = cfg.spHost   || '';
-  document.getElementById('cfg-site-path').value = cfg.sitePath || '';
+  document.getElementById('cfg-client-id').value   = cfg.clientId   || '';
+  document.getElementById('cfg-tenant-id').value   = cfg.tenantId   || '';
+  document.getElementById('cfg-sp-host').value     = cfg.spHost     || '';
+  document.getElementById('cfg-site-path').value   = cfg.sitePath   || '';
   document.getElementById('cfg-master-path').value = cfg.masterPath || '勤怠管理/社員マスタ.xlsx';
   document.getElementById('cfg-data-path').value   = cfg.dataPath   || '勤怠管理/勤怠データ.xlsx';
   showScreen('setup');
@@ -784,30 +1006,93 @@ async function saveConfigAndStart() {
 //  画面制御
 // ================================================================
 function showScreen(name) {
-  document.getElementById('setup-screen').style.display  = name === 'setup'   ? 'flex' : 'none';
+  document.getElementById('setup-screen').style.display   = name === 'setup'   ? 'flex' : 'none';
   document.getElementById('loading-screen').style.display = name === 'loading' ? 'flex' : 'none';
-  document.getElementById('main-screen').style.display   = name === 'main'    ? 'flex' : 'none';
+  document.getElementById('main-screen').style.display    = name === 'main'    ? 'flex' : 'none';
 }
 
 // ================================================================
-//  時計
+//  時計 ＋ 自動退勤（23:55）＋ 自動更新トリガー
 // ================================================================
+let autoLogoutExecutedDate = '';  // 自動退勤を実行した日付
+let autoRefreshSec = 0;           // 自動更新カウンター
+
 function updateClock() {
   const now = new Date();
-  document.getElementById('clock').textContent = now.toTimeString().slice(0, 8);
+  const hms  = now.toTimeString().slice(0, 8);
+  const hhmm = hms.slice(0, 5);
+  document.getElementById('clock').textContent = hms;
+
   const days = ['日','月','火','水','木','金','土'];
   document.getElementById('date-display').textContent =
     `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${days[now.getDay()]}）`;
+
+  // ── 自動退勤：23:55になったら未退勤者を自動退勤 ──
+  const today = todayStr();
+  if (hhmm === '23:55' && autoLogoutExecutedDate !== today && employees.length > 0) {
+    autoLogoutExecutedDate = today;
+    doAutoLogout(hms);
+  }
+
+  // ── 自動更新：60秒ごとにSharePointから最新データを取得 ──
+  autoRefreshSec++;
+  if (autoRefreshSec >= 60) {
+    autoRefreshSec = 0;
+    silentRefresh();
+  }
+}
+
+// 23:55 自動退勤処理
+async function doAutoLogout(timeStr) {
+  const targets = employees.filter(emp => {
+    const st = getStatus(emp.id);
+    return st === 'in' || st === 'out';
+  });
+  if (!targets.length) return;
+
+  showToast(`🕐 23:55 未退勤者${targets.length}名を自動退勤処理中...`, '#e67e22');
+  for (const emp of targets) {
+    await registerAction(emp.id, '退勤', timeStr);
+  }
+  showToast(`✅ 自動退勤完了（${targets.length}名）`, '#27ae60');
+}
+
+// バックグラウンド自動更新（通知なし）
+let silentRefreshing = false;
+async function silentRefresh() {
+  if (silentRefreshing || !dataDriveId) return;
+  silentRefreshing = true;
+  try {
+    const newRecords = await loadTodayRecords();
+    // 書き込み待ち中でないカードのみ更新
+    employees.forEach(emp => {
+      if (!pendingCards.has(emp.id)) {
+        todayRecords[emp.id] = newRecords[emp.id] || [];
+      }
+    });
+    renderGrid();
+    const t = new Date();
+    document.getElementById('sync-status').textContent =
+      `🔄 最終同期: ${t.toTimeString().slice(0,5)}`;
+  } catch(e) {
+    // サイレントエラー（画面は乱さない）
+    document.getElementById('sync-status').textContent = '⚠️ 同期失敗';
+  } finally {
+    silentRefreshing = false;
+  }
 }
 
 // ================================================================
-//  データ更新
+//  データ更新（手動）
 // ================================================================
 async function refreshData() {
   showToast('🔄 データを更新中...', '#3498db');
   try {
     [employees, todayRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
     renderGrid();
+    const t = new Date();
+    document.getElementById('sync-status').textContent =
+      `🔄 最終同期: ${t.toTimeString().slice(0,5)}`;
     showToast('✅ 更新完了', '#27ae60');
   } catch(e) {
     showError('更新失敗: ' + e.message);
@@ -823,7 +1108,7 @@ async function startApp(cfg) {
   try {
     await initMsal(cfg);
     setLoading('認証中...');
-    await getAccessToken(); // ログイン確認
+    await getAccessToken();
     setLoading('SharePointに接続中...');
     await initSharePoint(cfg);
     setLoading('社員データを読み込み中...');
