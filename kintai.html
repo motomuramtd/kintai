@@ -1153,6 +1153,12 @@ document.getElementById('current-url').textContent =
 updateClock();
 setInterval(updateClock, 1000);
 
+// URLに ?reset が含まれる場合は設定をクリアして設定画面を表示
+if (new URLSearchParams(location.search).has('reset')) {
+  localStorage.removeItem(CONFIG_KEY);
+  history.replaceState(null, '', location.pathname); // URLから?resetを除去
+}
+
 const cfg = loadConfig();
 if (!cfg || !cfg.clientId) {
   showScreen('setup');
