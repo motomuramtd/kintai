@@ -39,7 +39,6 @@
     header h1{font-size:18px;font-weight:700;color:#e94560;letter-spacing:2px;white-space:nowrap}
     #clock{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
     #date-display{font-size:13px;color:#aaa;text-align:right}
-    #sync-status{font-size:11px;color:#27ae60;margin-top:2px;text-align:right}
     .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .hdr-btn{background:#0f3460;color:#aaa;border:1px solid #1a4a7a;padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
     .hdr-btn:hover{background:#1a4a7a;color:#fff}
@@ -202,7 +201,6 @@
     </div>
     <div>
       <div id="date-display" style="font-size:13px;color:#aaa;text-align:right;margin-bottom:2px"></div>
-      <div id="sync-status">🔄 同期待機中</div>
       <div class="header-actions" style="margin-top:6px">
         <button class="hdr-btn" onclick="refreshData()">🔄 更新</button>
         <button class="hdr-btn" onclick="openAdmin()">📋 管理</button>
@@ -513,7 +511,7 @@ let writeLock = Promise.resolve();
 
 // 次書き込み行のキャッシュ（連続タップ時のstale read競合を防止）
 // { 'YYYY-MM': nextRowNumber }
-// silentRefresh / refreshData 後にリセットし、次回書き込み時に再取得する
+// refreshData 後にリセットし、次回書き込み時に再取得する
 let sheetNextRow = {};
 
 // 通常の1件追記
@@ -624,7 +622,6 @@ async function rewriteDayRecords(empId, dateStr, newLogs) {
 let employees = [];
 let todayRecords = {};    // { empId: [{type, time}] }
 let pendingCards = new Set();
-let recentWrites = {};    // { empId: true } 書き込み完了後の同期ガード（SP反映待ち）
 let selectedEmpId = null;
 
 function todayStr() {
@@ -753,7 +750,6 @@ async function registerAction(empId, type, timeStr) {
 
   try {
     await writeRecord(empId, type, time);
-    recentWrites[empId] = true; // 書き込み成功→SP反映待ちガード開始
   } catch(e) {
     todayRecords[empId].pop();
     showToast(`⚠️ 保存に失敗しました（${emp.name}）`, '#e74c3c');
@@ -1029,10 +1025,9 @@ function showScreen(name) {
 }
 
 // ================================================================
-//  時計 ＋ 自動退勤（23:55）＋ 自動更新トリガー
+//  時計 ＋ 自動退勤（23:55）
 // ================================================================
 let autoLogoutExecutedDate = '';  // 自動退勤を実行した日付
-let autoRefreshSec = 0;           // 自動更新カウンター
 
 function updateClock() {
   const now = new Date();
@@ -1049,13 +1044,6 @@ function updateClock() {
   if (hhmm === '23:55' && autoLogoutExecutedDate !== today && employees.length > 0) {
     autoLogoutExecutedDate = today;
     doAutoLogout(hms);
-  }
-
-  // ── 自動更新：30秒ごとにSharePointから最新データを取得 ──
-  autoRefreshSec++;
-  if (autoRefreshSec >= 30) {
-    autoRefreshSec = 0;
-    silentRefresh();
   }
 }
 
@@ -1074,76 +1062,16 @@ async function doAutoLogout(timeStr) {
   showToast(`✅ 自動退勤完了（${targets.length}名）`, '#27ae60');
 }
 
-// バックグラウンド自動更新（通知なし）
-let silentRefreshing = false;
-async function silentRefresh() {
-  if (silentRefreshing || !dataDriveId) return;
-  silentRefreshing = true;
-  try {
-    const newRecords = await loadTodayRecords();
-    // 書き込み待ち中のカードはスキップ
-    // 書き込み後（recentWrites）はSharePointのレコード数がローカルに追いつくまで上書きしない
-    employees.forEach(emp => {
-      if (pendingCards.has(emp.id)) return;
-
-      const localRecs  = todayRecords[emp.id] || [];
-      const fetchedRecs = newRecords[emp.id]  || [];
-
-      if (recentWrites[emp.id]) {
-        // SharePointのデータがローカルのレコード数に追いついたらガード解除して同期
-        if (fetchedRecs.length >= localRecs.length) {
-          delete recentWrites[emp.id];
-          todayRecords[emp.id] = fetchedRecs;
-        }
-        // まだ追いついていない → ローカルデータを保持（何もしない）
-      } else {
-        todayRecords[emp.id] = fetchedRecs;
-      }
-    });
-    // 同期完了後に行キャッシュをリセット→次の書き込み時にSPから最新行数を取得
-    delete sheetNextRow[todayStr().slice(0, 7)];
-    renderGrid();
-    const t = new Date();
-    document.getElementById('sync-status').textContent =
-      `🔄 最終同期: ${t.toTimeString().slice(0,5)}`;
-  } catch(e) {
-    // サイレントエラー（画面は乱さない）
-    document.getElementById('sync-status').textContent = '⚠️ 同期失敗';
-  } finally {
-    silentRefreshing = false;
-  }
-}
-
 // ================================================================
 //  データ更新（手動）
 // ================================================================
 async function refreshData() {
   showToast('🔄 データを更新中...', '#3498db');
   try {
-    const [newEmployees, newRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
-    employees = newEmployees;
-    // silentRefreshと同じく recentWrites ガードを適用
-    // （書き込み直後にSharePointが未反映でも打刻状態を保持）
-    employees.forEach(emp => {
-      if (pendingCards.has(emp.id)) return;
-      const localRecs   = todayRecords[emp.id] || [];
-      const fetchedRecs = newRecords[emp.id]   || [];
-      if (recentWrites[emp.id]) {
-        if (fetchedRecs.length >= localRecs.length) {
-          delete recentWrites[emp.id];
-          todayRecords[emp.id] = fetchedRecs;
-        }
-        // SharePoint未反映ならローカルを保持（上書きしない）
-      } else {
-        todayRecords[emp.id] = fetchedRecs;
-      }
-    });
-    // 更新完了後に行キャッシュをリセット
+    [employees, todayRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
+    // 更新後に行キャッシュをリセット（次回書き込み時にSPから最新行数を再取得）
     delete sheetNextRow[todayStr().slice(0, 7)];
     renderGrid();
-    const t = new Date();
-    document.getElementById('sync-status').textContent =
-      `🔄 最終同期: ${t.toTimeString().slice(0,5)}`;
     showToast('✅ 更新完了', '#27ae60');
   } catch(e) {
     showError('更新失敗: ' + e.message);
