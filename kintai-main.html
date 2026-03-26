@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>勤怠管理システム</title>
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;background:#0d1117;color:#e6edf3;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+    /* ===== Fullscreen ===== */
+    .fullscreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:500}
+
+    /* ===== Setup ===== */
+    #setup-screen{background:#0d1117;display:none;overflow-y:auto;align-items:flex-start;padding:24px}
+    .setup-card{background:#161b22;border-radius:16px;padding:28px 32px;width:100%;max-width:600px;margin:auto;border:1px solid #30363d}
+    .setup-card h1{font-size:22px;margin-bottom:4px;color:#58a6ff}
+    .setup-card p{color:#8b949e;font-size:14px;margin-bottom:24px}
+    .setup-section{font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #30363d}
+    .setup-section:first-of-type{margin-top:0;padding-top:0;border-top:none}
+    .setup-card label{display:block;font-size:13px;color:#cdd9e5;margin-bottom:4px;margin-top:12px}
+    .setup-card input,.setup-card select{width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px 12px;border-radius:8px;font-size:14px;outline:none}
+    .setup-card input:focus{border-color:#58a6ff}
+    .setup-inline{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .setup-save-btn{width:100%;margin-top:24px;padding:14px;background:#238636;border:none;color:#fff;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+    .setup-save-btn:hover{background:#2ea043}
+    .setup-hint{font-size:12px;color:#6e7681;margin-top:8px;line-height:1.6}
+
+    /* ===== Loading ===== */
+    #loading-screen{background:rgba(13,17,23,.96);display:none;flex-direction:column;gap:16px}
+    .spinner{width:48px;height:48px;border:4px solid #21262d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ===== Layout ===== */
+    #main-screen{flex:1;display:none;overflow:hidden}
+    .app-layout{display:flex;height:100vh}
+
+    /* ===== Sidebar ===== */
+    #sidebar{width:220px;background:#161b22;border-right:1px solid #30363d;display:flex;flex-direction:column;flex-shrink:0;transition:width .2s}
+    .sidebar-header{padding:16px;border-bottom:1px solid #30363d}
+    .sidebar-header h1{font-size:14px;font-weight:700;color:#58a6ff;white-space:nowrap}
+    .sidebar-header p{font-size:11px;color:#6e7681;margin-top:2px}
+    .sidebar-nav{flex:1;padding:8px 0;overflow-y:auto}
+    .nav-section{font-size:10px;color:#6e7681;padding:12px 16px 4px;text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:13px;color:#8b949e;border-left:3px solid transparent;transition:background .12s,color .12s}
+    .nav-item:hover{background:#1c2128;color:#e6edf3}
+    .nav-item.active{background:#1c2128;color:#58a6ff;border-left-color:#58a6ff}
+    .nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+    .sidebar-footer{padding:10px 12px;border-top:1px solid #30363d;display:flex;flex-direction:column;gap:6px}
+    .sidebar-user{font-size:11px;color:#6e7681;display:flex;align-items:center;gap:6px;padding:2px 4px}
+    .user-dot{width:7px;height:7px;border-radius:50%;background:#3fb950;flex-shrink:0}
+    .sb-btn{background:none;border:1px solid #30363d;color:#8b949e;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;text-align:left;width:100%;white-space:nowrap}
+    .sb-btn:hover{background:#21262d;color:#e6edf3}
+    .sb-btn.red:hover{background:#3a1a1a;color:#ff9999;border-color:#8a2a2a}
+
+    /* ===== Content ===== */
+    #content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+    .content-header{background:#161b22;border-bottom:1px solid #30363d;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .content-header h2{font-size:17px;font-weight:700}
+    .content-header .sub{font-size:11px;color:#8b949e;margin-top:2px}
+    #header-clock{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:#8b949e}
+    .content-body{flex:1;overflow-y:auto;padding:20px 24px}
+
+    /* ===== Pages ===== */
+    .page{display:none}.page.active{display:block}
+
+    /* ===== Summary Cards ===== */
+    .card-row{display:grid;gap:14px;margin-bottom:18px}
+    .cols-4{grid-template-columns:repeat(4,1fr)}
+    .cols-3{grid-template-columns:repeat(3,1fr)}
+    .cols-2{grid-template-columns:repeat(2,1fr)}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px 18px}
+    .card h3{font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+    .card-val{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+    .c-blue{color:#58a6ff}.c-green{color:#3fb950}.c-yellow{color:#d29922}.c-red{color:#f85149}.c-muted{color:#8b949e}
+    .card-sub{font-size:11px;color:#8b949e;margin-top:4px}
+
+    /* ===== Charts ===== */
+    .chart-card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px 18px}
+    .chart-card h3{font-size:12px;font-weight:700;color:#8b949e;margin-bottom:12px}
+    .chart-wrap{position:relative}
+
+    /* ===== Tables ===== */
+    .tbl-card{background:#161b22;border:1px solid #30363d;border-radius:10px;overflow:hidden;margin-bottom:18px}
+    .tbl-hdr{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30363d;flex-wrap:wrap;gap:8px}
+    .tbl-hdr h3{font-size:13px;font-weight:700}
+    .tbl{width:100%;border-collapse:collapse;font-size:12px}
+    .tbl th{background:#0d1117;padding:9px 12px;text-align:left;font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid #30363d;position:sticky;top:0;z-index:1}
+    .tbl td{padding:8px 12px;border-bottom:1px solid #1c2128;vertical-align:middle;white-space:nowrap}
+    .tbl tr:last-child td{border-bottom:none}
+    .tbl tr:hover td{background:rgba(255,255,255,.025)}
+    .tbl .r{text-align:right;font-variant-numeric:tabular-nums}
+    .c-warn-cell{color:#d29922;font-weight:600}
+    .c-danger-cell{color:#f85149;font-weight:700}
+
+    /* ===== Tags ===== */
+    .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+    .t-ok{background:#1a3a2a;color:#3fb950}
+    .t-warn{background:#332a00;color:#d29922}
+    .t-danger{background:#3a1a1a;color:#f85149}
+    .t-muted{background:#21262d;color:#8b949e}
+    .gbadge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:#1c2128;color:#7d9ab5;margin-left:4px}
+
+    /* ===== OT progress bar ===== */
+    .ot-wrap{display:flex;align-items:center;gap:8px}
+    .ot-bar{flex:0 0 100px;height:5px;background:#21262d;border-radius:3px;overflow:hidden}
+    .ot-fill{height:100%;border-radius:3px}.ot-ok{background:#3fb950}.ot-warn{background:#d29922}.ot-danger{background:#f85149}
+
+    /* ===== Period toolbar ===== */
+    .period-bar{display:flex;align-items:center;gap:10px;padding:10px 0 16px;flex-wrap:wrap}
+    .period-bar label{font-size:12px;color:#8b949e}
+    .period-bar select,.period-bar input[type=number]{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:6px 10px;border-radius:7px;font-size:13px;cursor:pointer;outline:none}
+    .pb-btn{background:#21262d;border:1px solid #30363d;color:#cdd9e5;padding:6px 12px;border-radius:7px;font-size:13px;cursor:pointer}
+    .pb-btn:hover{background:#2d333b}
+    .pb-label{font-weight:700;font-size:14px;min-width:140px;text-align:center}
+    .btn-export{background:#238636;border:none;color:#fff;padding:7px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600}
+    .btn-export:hover{background:#2ea043}
+
+    /* ===== Monthly pivot ===== */
+    .monthly-wrap{overflow:auto;max-height:calc(100vh - 260px)}
+    .m-tbl{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%}
+    .m-tbl th{background:#0d1117;padding:7px 10px;text-align:center;position:sticky;top:0;white-space:nowrap;border:1px solid #30363d;z-index:1}
+    .m-tbl td{padding:5px 10px;border:1px solid #1c2128;text-align:center;white-space:nowrap}
+    .m-tbl .nc{text-align:left;position:sticky;left:0;background:#161b22;z-index:1;min-width:130px;padding-left:12px}
+    .m-tbl thead .nc{z-index:3}
+    .m-tbl .tot-row td{background:#0d1117;font-weight:700;position:sticky;bottom:0}
+    .m-tbl .tot-row .nc{background:#0d1117;z-index:2}
+    .m-ot{color:#d29922}.m-ot-hi{color:#f85149;font-weight:700}.m-none{color:#30363d}
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:#0d1117}
+    ::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+
+    /* ===== Toast ===== */
+    #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#238636;color:#fff;padding:10px 22px;border-radius:40px;font-size:14px;font-weight:700;z-index:999;transition:transform .3s,opacity .3s;opacity:0;white-space:nowrap}
+    #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+    @media(max-width:1100px){.cols-4{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+
+<!-- ===== Setup ===== -->
+<div id="setup-screen" class="fullscreen">
+  <div class="setup-card">
+    <h1>⚙️ システム設定</h1>
+    <p>SharePoint接続と勤務ルールを設定してください（設定はこのブラウザに保存されます）</p>
+
+    <div class="setup-section">Azure AD / SharePoint 接続</div>
+    <label>クライアントID</label>
+    <input type="text" id="cfg-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <label>テナントID</label>
+    <input type="text" id="cfg-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <label>SharePointホスト名</label>
+    <input type="text" id="cfg-sp-host" placeholder="contoso.sharepoint.com">
+    <label>サイトパス</label>
+    <input type="text" id="cfg-site-path" placeholder="/sites/kintai">
+    <label>社員マスタ.xlsx のパス</label>
+    <input type="text" id="cfg-master-path" placeholder="勤怠管理/社員マスタ.xlsx">
+    <label>勤怠データ.xlsx のパス</label>
+    <input type="text" id="cfg-data-path" placeholder="勤怠管理/勤怠データ.xlsx">
+
+    <div class="setup-section">勤務ルール</div>
+    <div class="setup-inline">
+      <div><label>始業時刻</label><input type="time" id="cfg-work-start" value="08:30"></div>
+      <div><label>終業時刻</label><input type="time" id="cfg-work-end" value="17:00"></div>
+      <div><label>休憩開始</label><input type="time" id="cfg-break-start" value="12:00"></div>
+      <div><label>休憩終了</label><input type="time" id="cfg-break-end" value="12:45"></div>
+    </div>
+    <label>残業時間上限（時間 / 月）</label>
+    <input type="number" id="cfg-ot-limit" value="45" min="1" max="300" style="width:140px">
+
+    <button class="setup-save-btn" onclick="saveConfigAndStart()">保存して起動</button>
+    <div class="setup-hint">
+      ※ Azure ADのアプリ登録でリダイレクトURIに <strong id="current-url" style="color:#58a6ff"></strong> を追加してください。<br>
+      ※ タブレットの打刻アプリと同じAzure ADアプリ・SharePoint設定を使えます。
+    </div>
+  </div>
+</div>
+
+<!-- ===== Loading ===== -->
+<div id="loading-screen" class="fullscreen">
+  <div style="text-align:center">
+    <div class="spinner" style="margin:0 auto"></div>
+    <div id="loading-message" style="margin-top:20px;color:#8b949e;font-size:15px">読み込み中...</div>
+  </div>
+</div>
+
+<!-- ===== Main ===== -->
+<div id="main-screen">
+  <div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h1>📋 勤怠管理システム</h1>
+        <p>管理・分析</p>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">メインメニュー</div>
+        <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+          <span class="nav-icon">🏠</span><span>ダッシュボード</span>
+        </div>
+        <div class="nav-item" data-page="monthly" onclick="showPage('monthly')">
+          <span class="nav-icon">📊</span><span>月次集計</span>
+        </div>
+        <div class="nav-item" data-page="overtime" onclick="showPage('overtime')">
+          <span class="nav-icon">⏰</span><span>残業管理</span>
+        </div>
+        <div class="nav-item" data-page="individual" onclick="showPage('individual')">
+          <span class="nav-icon">👤</span><span>個人詳細</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="user-dot"></div>
+          <span id="sidebar-user-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+        </div>
+        <button class="sb-btn" onclick="openSettings()">⚙️ 設定変更</button>
+        <button class="sb-btn red" onclick="signOut()">🚪 ログアウト</button>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <div id="content">
+      <div class="content-header">
+        <div>
+          <h2 id="page-title">ダッシュボード</h2>
+          <div class="sub" id="page-sub">今日の状況と今月のサマリー</div>
+        </div>
+        <div id="header-clock">00:00:00</div>
+      </div>
+      <div class="content-body">
+
+        <!-- ===== Dashboard ===== -->
+        <div class="page active" id="page-dashboard">
+          <div class="card-row cols-4" id="dash-cards">
+            <div class="card"><h3>本日の出勤</h3><div class="card-val c-blue" id="d-today">—</div><div class="card-sub" id="d-today-sub">—</div></div>
+            <div class="card"><h3>今月の出勤率</h3><div class="card-val c-green" id="d-rate">—</div><div class="card-sub" id="d-rate-sub">—</div></div>
+            <div class="card"><h3>今月の残業合計</h3><div class="card-val c-yellow" id="d-ot-total">—</div><div class="card-sub" id="d-ot-sub">—</div></div>
+            <div class="card"><h3>残業アラート</h3><div class="card-val c-red" id="d-alert">—</div><div class="card-sub" id="d-alert-sub">上限超過</div></div>
+          </div>
+          <div class="card-row cols-2">
+            <div class="chart-card">
+              <h3>月次残業時間推移（直近6ヶ月・合計）</h3>
+              <div class="chart-wrap" style="height:210px"><canvas id="ch-trend"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <h3>グループ別 今月平均残業時間</h3>
+              <div class="chart-wrap" style="height:210px"><canvas id="ch-group"></canvas></div>
+            </div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-hdr">
+              <h3>⏰ 今月の残業ランキング（上位10名）</h3>
+              <span id="d-period-label" style="font-size:11px;color:#8b949e"></span>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="tbl">
+                <thead><tr><th>#</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r">残業時間</th><th>状況</th></tr></thead>
+                <tbody id="d-rank-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Monthly ===== -->
+        <div class="page" id="page-monthly">
+          <div class="period-bar">
+            <label>年度</label>
+            <button class="pb-btn" onclick="changeMonthlyFY(-1)">◀</button>
+            <span class="pb-label" id="m-fy-label"></span>
+            <button class="pb-btn" onclick="changeMonthlyFY(1)">▶</button>
+            <label style="margin-left:16px">表示項目</label>
+            <select id="m-view" onchange="renderMonthlyPage()">
+              <option value="days">出勤日数</option>
+              <option value="work">実働時間</option>
+              <option value="ot">残業時間</option>
+            </select>
+            <button class="btn-export" onclick="exportMonthlyCsv()" style="margin-left:auto">📥 CSV出力</button>
+          </div>
+          <div class="monthly-wrap">
+            <div id="m-table-wrap"><div style="text-align:center;padding:40px;color:#8b949e">読み込み中...</div></div>
+          </div>
+        </div>
+
+        <!-- ===== Overtime ===== -->
+        <div class="page" id="page-overtime">
+          <div class="period-bar">
+            <label>集計月</label>
+            <button class="pb-btn" onclick="changeOtPeriod(-1)">◀</button>
+            <span class="pb-label" id="ot-period-label"></span>
+            <button class="pb-btn" onclick="changeOtPeriod(1)">▶</button>
+            <button class="pb-btn" onclick="renderOvertimePage()" style="margin-left:6px">🔄</button>
+          </div>
+          <div class="card-row cols-3" style="margin-bottom:18px">
+            <div class="card"><h3>集計期間</h3><div class="card-val" id="ot-range" style="font-size:16px">—</div></div>
+            <div class="card"><h3>総残業時間</h3><div class="card-val c-yellow" id="ot-sum">—</div><div class="card-sub" id="ot-avg">—</div></div>
+            <div class="card"><h3>上限超過</h3><div class="card-val c-red" id="ot-over">—<span style="font-size:14px;color:#8b949e"> 名</span></div><div class="card-sub" id="ot-limit-label"></div></div>
+          </div>
+          <div class="card-row cols-2">
+            <div class="chart-card" style="height:340px">
+              <h3>残業時間ランキング（時間）</h3>
+              <div class="chart-wrap" style="height:280px"><canvas id="ch-ot-rank"></canvas></div>
+            </div>
+            <div class="tbl-card" style="max-height:340px;display:flex;flex-direction:column">
+              <div class="tbl-hdr"><h3>⚠️ アラート一覧（70%以上）</h3></div>
+              <div style="overflow-y:auto;flex:1">
+                <table class="tbl"><thead><tr><th>氏名</th><th>G</th><th class="r">残業時間</th><th>状況</th></tr></thead>
+                <tbody id="ot-alert-tbody"></tbody></table>
+              </div>
+            </div>
+          </div>
+          <div class="tbl-card" style="margin-top:18px">
+            <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
+            <div style="overflow-x:auto">
+              <table class="tbl">
+                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r">残業時間</th><th>進捗</th><th>状況</th></tr></thead>
+                <tbody id="ot-detail-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Individual ===== -->
+        <div class="page" id="page-individual">
+          <div class="period-bar">
+            <label>社員</label>
+            <select id="ind-sel" onchange="renderIndividualPage()" style="min-width:200px">
+              <option value="">— 選択 —</option>
+            </select>
+            <label style="margin-left:16px">年度</label>
+            <button class="pb-btn" onclick="changeIndFY(-1)">◀</button>
+            <span id="ind-fy-label" class="pb-label" style="min-width:80px"></span>
+            <button class="pb-btn" onclick="changeIndFY(1)">▶</button>
+          </div>
+          <div id="ind-content">
+            <div style="text-align:center;padding:80px;color:#8b949e">↑ 社員を選択してください</div>
+          </div>
+        </div>
+
+      </div><!-- /content-body -->
+    </div><!-- /content -->
+  </div><!-- /app-layout -->
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ================================================================
+//  設定管理
+// ================================================================
+const CONFIG_KEY  = 'kintai_sp_config';
+const MAIN_KEY    = 'kintai_main_config';
+
+function loadSpCfg()   { try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); }  catch(e){ return null; } }
+function loadMainCfg() {
+  const def = { workStart:'08:30', workEnd:'17:00', breakStart:'12:00', breakEnd:'12:45', otLimit:45 };
+  try { return Object.assign({}, def, JSON.parse(localStorage.getItem(MAIN_KEY))); } catch(e){ return def; }
+}
+function saveAllCfg(sp, mc) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(sp));
+  localStorage.setItem(MAIN_KEY,   JSON.stringify(mc));
+}
+
+// ================================================================
+//  MSAL 認証
+// ================================================================
+let msalInst = null, curAccount = null;
+const SCOPES = ['Files.ReadWrite','Sites.ReadWrite.All'];
+
+async function initMsal(cfg) {
+  msalInst = new msal.PublicClientApplication({
+    auth:  { clientId: cfg.clientId, authority:`https://login.microsoftonline.com/${cfg.tenantId}`, redirectUri: location.href.split('?')[0].split('#')[0] },
+    cache: { cacheLocation:'localStorage', storeAuthStateInCookie:true }
+  });
+  const r = await msalInst.handleRedirectPromise();
+  if (r) curAccount = r.account;
+}
+async function getToken() {
+  const accs = msalInst.getAllAccounts();
+  if (!accs.length) { await msalInst.loginRedirect({ scopes:SCOPES }); return; }
+  curAccount = accs[0];
+  document.getElementById('sidebar-user-name').textContent = curAccount.name || curAccount.username;
+  try { return (await msalInst.acquireTokenSilent({ scopes:SCOPES, account:curAccount })).accessToken; }
+  catch(e) { await msalInst.acquireTokenRedirect({ scopes:SCOPES, account:curAccount }); }
+}
+function signOut() {
+  if (!confirm('ログアウトしますか？')) return;
+  msalInst.logoutRedirect({ account: curAccount });
+}
+
+// ================================================================
+//  Graph API
+// ================================================================
+const GR = 'https://graph.microsoft.com/v1.0';
+async function gGet(path) {
+  const token = await getToken();
+  const res = await fetch(GR + path, { headers:{ Authorization:`Bearer ${token}` } });
+  if (!res.ok) throw Object.assign(new Error(`Graph ${res.status}: ${await res.text()}`), { status:res.status });
+  return res.json();
+}
+
+// ================================================================
+//  SharePoint / Excel
+// ================================================================
+let siteId, mDriveId, mItemId, dDriveId, dItemId;
+
+async function initSP(cfg) {
+  const site = await gGet(`/sites/${cfg.spHost}:${cfg.sitePath}`);
+  siteId = site.id;
+  async function resolve(fp) {
+    const parts = fp.split('/'), lib = parts[0], sub = parts.slice(1).join('/');
+    const { value:drives } = await gGet(`/sites/${siteId}/drives`);
+    const drv = drives.find(d => d.name===lib || d.webUrl.split('/').pop()===lib);
+    if (drv) { const it = await gGet(`/drives/${drv.id}/root:/${sub}`); return { dId:drv.id, iId:it.id }; }
+    const it = await gGet(`/sites/${siteId}/drive/root:/${fp}`);
+    return { dId:it.parentReference.driveId, iId:it.id };
+  }
+  const [m, d] = await Promise.all([resolve(cfg.masterPath), resolve(cfg.dataPath)]);
+  mDriveId=m.dId; mItemId=m.iId; dDriveId=d.dId; dItemId=d.iId;
+}
+
+async function loadEmployees() {
+  const rng = await gGet(`/drives/${mDriveId}/items/${mItemId}/workbook/worksheets('社員マスタ')/usedRange`);
+  return (rng.values||[]).slice(1).filter(r=>r[0]&&r[1])
+    .map(r=>({ id:String(r[0]).trim(), name:String(r[1]).trim(), group:r[2]?String(r[2]).trim():'' }));
+}
+
+// シートキャッシュ: { 'YYYY-MM': { 'YYYY-MM-DD': { empId:[{type,time}] } } }
+const SC = {};
+async function ensureSheets(names) {
+  const todo = names.filter(n => SC[n]===undefined);
+  if (!todo.length) return;
+  await Promise.all(todo.map(async sn => {
+    try {
+      const rng = await gGet(`/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('${sn}')/usedRange`);
+      const byDate = {};
+      (rng.values||[]).slice(1).forEach(row => {
+        if (!row[0]) return;
+        const d=String(row[0]).slice(0,10), eid=String(row[1]);
+        if (!byDate[d]) byDate[d]={};
+        if (!byDate[d][eid]) byDate[d][eid]=[];
+        byDate[d][eid].push({ type:String(row[3]), time:String(row[4]) });
+      });
+      SC[sn] = byDate;
+    } catch(e) { SC[sn]={}; }
+  }));
+}
+function dayRecs(ds, empId) { return ((SC[ds.slice(0,7)]||{})[ds]||{})[empId]||[]; }
+
+// ================================================================
+//  時間計算
+// ================================================================
+let MC = {}; // mainCfg
+
+function t2m(s) { const [h,m]=(s||'00:00').split(':').map(Number); return h*60+m; }
+function m2hm(min) {
+  if (min===null||min===undefined||isNaN(min)) return '—';
+  const s=min<0?'-':'', a=Math.abs(min);
+  return `${s}${Math.floor(a/60)}:${String(a%60).padStart(2,'0')}`;
+}
+
+function calcDay(logs) {
+  if (!logs||!logs.length) return null;
+  const ci = logs.find(l=>l.type==='出勤');
+  const co = [...logs].reverse().find(l=>l.type==='退勤');
+  if (!ci) return null;
+  const inM=t2m(ci.time), outM=co?t2m(co.time):null;
+
+  // 外出合計
+  let absM=0, goM=null;
+  logs.forEach(l=>{
+    const t=t2m(l.time);
+    if (l.type==='外出') goM=t;
+    else if ((l.type==='戻り'||l.type==='退勤')&&goM!==null){ absM+=t-goM; goM=null; }
+  });
+
+  if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null };
+
+  const stay = outM - inM - absM;
+  const bs=t2m(MC.breakStart||'12:00'), be=t2m(MC.breakEnd||'12:45');
+  let brk=0;
+  if (outM>bs && inM<be) brk=Math.max(0, Math.min(outM,be)-Math.max(inM,bs));
+  const workM = stay - brk;
+  const prescM = t2m(MC.workEnd||'17:00') - t2m(MC.workStart||'08:30') - (be-bs);
+  const otM = Math.max(0, workM - prescM);
+  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM };
+}
+
+function aggPeriod(empId, start, end) {
+  let days=0, workM=0, otM=0;
+  let d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
+  while (d<=ed) {
+    const ds=d.toLocaleDateString('sv');
+    const logs=dayRecs(ds,empId), st=calcDay(logs);
+    if (st&&st.workM!==null){ days++; workM+=st.workM; otM+=st.otM||0; }
+    else if (logs.some(r=>r.type==='出勤')) days++;
+    d.setDate(d.getDate()+1);
+  }
+  return { days, workM, otM };
+}
+
+// ================================================================
+//  会計年度ヘルパー
+// ================================================================
+function getFY() {
+  const m=new Date().getMonth()+1, y=new Date().getFullYear();
+  return m>=10?y:y-1;
+}
+function getPeriods(fy) {
+  const ps=[];
+  for (let p=0;p<12;p++) {
+    const em=((p+9)%12)+1, ey=p<=2?fy:fy+1;
+    let sm=em-1, sy=ey; if(sm===0){sm=12;sy--;}
+    const start=`${sy}-${String(sm).padStart(2,'0')}-21`;
+    const end  =`${ey}-${String(em).padStart(2,'0')}-20`;
+    ps.push({ label:`${em}月`, tip:`${sy}/${sm}/21〜${ey}/${em}/20`, start, end, em, ey });
+  }
+  return ps;
+}
+function curPeriod(fy) {
+  const today=new Date(), ps=getPeriods(fy);
+  return ps.find(p=>today>=new Date(p.start+'T00:00:00')&&today<=new Date(p.end+'T00:00:00'))||ps[ps.length-1];
+}
+function sheetsFor(ps) { const s=new Set(); ps.forEach(p=>{s.add(p.start.slice(0,7));s.add(p.end.slice(0,7));}); return [...s]; }
+function workdays(start, end) {
+  let cnt=0, d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
+  while (d<=ed){ if(d.getDay()&&d.getDay()!==6) cnt++; d.setDate(d.getDate()+1); }
+  return cnt;
+}
+
+// ================================================================
+//  状態
+// ================================================================
+let employees=[], dashInited=false;
+let monthlyFY=getFY(), otFY=getFY(), otPIdx=null, indFY=getFY();
+let chTrend=null, chGroup=null, chRank=null;
+
+// ================================================================
+//  ページ制御
+// ================================================================
+const PAGE_META = {
+  dashboard: ['ダッシュボード','今日の状況と今月のサマリー'],
+  monthly:   ['月次集計','出勤日数・実働時間・残業時間の月別一覧'],
+  overtime:  ['残業管理','残業時間の集計・上限アラート・ランキング'],
+  individual:['個人詳細','社員別の勤怠履歴と月次サマリー'],
+};
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  document.querySelector(`[data-page="${name}"]`).classList.add('active');
+  const [t,s]=PAGE_META[name]||[name,''];
+  document.getElementById('page-title').textContent=t;
+  document.getElementById('page-sub').textContent=s;
+  if (name==='dashboard'&&!dashInited){ dashInited=true; renderDashboard(); }
+  if (name==='monthly')   renderMonthlyPage();
+  if (name==='overtime')  { if(otPIdx===null){ const ps=getPeriods(otFY); otPIdx=ps.findIndex(p=>{const t=new Date(),s=new Date(p.start+'T00:00:00'),e=new Date(p.end+'T00:00:00');return t>=s&&t<=e;}); if(otPIdx<0)otPIdx=11; } renderOvertimePage(); }
+  if (name==='individual') initIndPage();
+}
+
+// ================================================================
+//  画面制御
+// ================================================================
+function showScreen(n) {
+  document.getElementById('setup-screen').style.display  =n==='setup'  ?'flex':'none';
+  document.getElementById('loading-screen').style.display=n==='loading'?'flex':'none';
+  document.getElementById('main-screen').style.display   =n==='main'   ?'block':'none';
+}
+function setLoading(m){ document.getElementById('loading-message').textContent=m; }
+let toastT;
+function toast(msg,bg='#238636'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=bg;
+  t.classList.add('show'); clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ================================================================
+//  ダッシュボード
+// ================================================================
+async function renderDashboard() {
+  const fy=getFY(), periods=getPeriods(fy);
+  const cp=curPeriod(fy);
+  document.getElementById('d-period-label').textContent=`集計期間: ${cp.tip}`;
+
+  // 直近6ヶ月 + 今月のシートを並列読み込み
+  const recent=periods.slice(-6);
+  await ensureSheets(sheetsFor([cp,...recent]));
+
+  const today=new Date().toLocaleDateString('sv');
+  const todayMap=SC[today.slice(0,7)]?.[today]||{};
+
+  // 今日の出勤
+  const todayIn=employees.filter(e=>(todayMap[e.id]||[]).some(r=>r.type==='出勤')).length;
+  document.getElementById('d-today').textContent=`${todayIn}名`;
+  document.getElementById('d-today-sub').textContent=`全${employees.length}名中`;
+
+  // 今月集計
+  const stats=employees.map(emp=>({ ...emp, ...aggPeriod(emp.id,cp.start,cp.end) }));
+  const totalOt=stats.reduce((s,e)=>s+e.otM,0);
+  const otLimit=(MC.otLimit||45)*60;
+  const alertCnt=stats.filter(e=>e.otM>=otLimit).length;
+
+  const maxDays=workdays(cp.start, today<=cp.end?today:cp.end);
+  const avgDays=stats.reduce((s,e)=>s+e.days,0)/employees.length;
+  const rate=maxDays>0?Math.round(avgDays/maxDays*100):0;
+  document.getElementById('d-rate').textContent=`${rate}%`;
+  document.getElementById('d-rate-sub').textContent=`平均 ${avgDays.toFixed(1)}日 / ${maxDays}日`;
+  document.getElementById('d-ot-total').textContent=m2hm(totalOt);
+  document.getElementById('d-ot-sub').textContent=`平均 ${m2hm(Math.round(totalOt/employees.length))} / 人`;
+  document.getElementById('d-alert').textContent=alertCnt;
+  document.getElementById('d-alert-sub').textContent=`${MC.otLimit||45}h 超過`;
+
+  // ランキング
+  const ranked=[...stats].sort((a,b)=>b.otM-a.otM).slice(0,10);
+  document.getElementById('d-rank-tbody').innerHTML=ranked.map((e,i)=>{
+    const pct=Math.min(100,Math.round(e.otM/otLimit*100));
+    const cls=e.otM>=otLimit?'danger':e.otM>=otLimit*.8?'warn':'ok';
+    const tCls={ok:'t-ok',warn:'t-warn',danger:'t-danger'}[cls];
+    const bCls=`ot-${cls}`;
+    return `<tr>
+      <td style="color:#8b949e;font-weight:700;font-size:12px">#${i+1}</td>
+      <td><strong>${e.name}</strong>${e.group?`<span class="gbadge">${e.group}</span>`:''}</td>
+      <td><span class="gbadge">${e.group||'—'}</span></td>
+      <td class="r">${e.days}日</td>
+      <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
+      <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">
+        <div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ${bCls}" style="width:${pct}%"></div></div>${m2hm(e.otM)}</div>
+      </td>
+      <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
+    </tr>`;
+  }).join('');
+
+  // チャート: 月次残業推移
+  const tLabels=recent.map(p=>p.label);
+  const tData=recent.map(p=>{
+    const tot=employees.reduce((s,e)=>s+aggPeriod(e.id,p.start,p.end).otM,0);
+    return parseFloat((tot/60).toFixed(1));
+  });
+  if (chTrend) chTrend.destroy();
+  chTrend=new Chart(document.getElementById('ch-trend'),{
+    type:'line',
+    data:{ labels:tLabels, datasets:[{
+      label:'総残業(h)', data:tData,
+      borderColor:'#d29922', backgroundColor:'rgba(210,153,34,.12)',
+      fill:true, tension:.3, pointRadius:5, pointBackgroundColor:'#d29922'
+    }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'} }, y:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'}, beginAtZero:true } }
+    }
+  });
+
+  // チャート: グループ別平均残業
+  const grps=[...new Set(employees.map(e=>e.group||'その他'))].sort();
+  const gData=grps.map(g=>{
+    const mem=stats.filter(e=>(e.group||'その他')===g);
+    if (!mem.length) return 0;
+    return parseFloat((mem.reduce((s,e)=>s+e.otM,0)/mem.length/60).toFixed(1));
+  });
+  if (chGroup) chGroup.destroy();
+  chGroup=new Chart(document.getElementById('ch-group'),{
+    type:'bar',
+    data:{ labels:grps, datasets:[{
+      label:'平均残業(h)', data:gData,
+      backgroundColor:grps.map((_,i)=>`hsl(${200+i*28},60%,55%)`), borderRadius:4
+    }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'} }, y:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'}, beginAtZero:true } }
+    }
+  });
+}
+
+// ================================================================
+//  月次集計
+// ================================================================
+async function renderMonthlyPage() {
+  document.getElementById('m-fy-label').textContent=`${monthlyFY}年度（${monthlyFY}/10〜${monthlyFY+1}/9）`;
+  const wrap=document.getElementById('m-table-wrap');
+  wrap.innerHTML='<div style="text-align:center;padding:40px;color:#8b949e">読み込み中...</div>';
+  const periods=getPeriods(monthlyFY);
+  await ensureSheets(sheetsFor(periods));
+  const vt=document.getElementById('m-view').value;
+  const otLimit=(MC.otLimit||45)*60;
+
+  const allSt=employees.map(emp=>({
+    emp, ps:periods.map(p=>aggPeriod(emp.id,p.start,p.end))
+  }));
+
+  let html=`<table class="m-tbl"><thead><tr>
+    <th class="nc">氏名</th>`;
+  periods.forEach(p=>{ html+=`<th title="${p.tip}">${p.label}<br><span style="font-size:9px;opacity:.5;font-weight:400">${p.tip.slice(p.tip.indexOf('/')+1)}</span></th>`; });
+  html+=`<th>合計</th></tr></thead><tbody>`;
+
+  allSt.forEach(({emp,ps})=>{
+    const gb=emp.group?`<span class="gbadge">${emp.group}</span>`:'';
+    let tot=0;
+    html+=`<tr><td class="nc">${emp.name}${gb}</td>`;
+    ps.forEach(s=>{
+      let val='—', cls='m-none';
+      if (vt==='days'&&s.days>0){ val=`${s.days}日`; cls=''; tot+=s.days; }
+      else if (vt==='work'&&s.workM>0){ val=m2hm(s.workM); cls=''; tot+=s.workM; }
+      else if (vt==='ot'&&s.otM>0){ val=m2hm(s.otM); cls=s.otM>=otLimit?'m-ot-hi':s.otM>=otLimit*.7?'m-ot':''; tot+=s.otM; }
+      html+=`<td class="${cls}">${val}</td>`;
+    });
+    const totStr=vt==='days'?`${tot}日`:(tot>0?m2hm(tot):'—');
+    html+=`<td style="font-weight:700">${totStr}</td></tr>`;
+  });
+
+  // 合計行
+  html+=`<tr class="tot-row"><td class="nc">合 計</td>`;
+  periods.forEach((_,pi)=>{
+    let tot=0;
+    allSt.forEach(({ps})=>{
+      if(vt==='days') tot+=ps[pi].days;
+      else if(vt==='work') tot+=ps[pi].workM;
+      else tot+=ps[pi].otM;
+    });
+    html+=`<td>${vt==='days'?tot+'日':tot>0?m2hm(tot):'—'}</td>`;
+  });
+  html+=`<td>—</td></tr></tbody></table>`;
+  wrap.innerHTML=html;
+}
+function changeMonthlyFY(d){ monthlyFY+=d; renderMonthlyPage(); }
+
+function exportMonthlyCsv() {
+  const periods=getPeriods(monthlyFY);
+  const vt=document.getElementById('m-view').value;
+  const hdr=['社員ID','氏名','グループ',...periods.map(p=>p.label),'合計'];
+  const rows=employees.map(emp=>{
+    const ps=periods.map(p=>aggPeriod(emp.id,p.start,p.end));
+    let tot=0;
+    const cells=ps.map(s=>{
+      let v=vt==='days'?s.days:vt==='work'?s.workM:s.otM; tot+=v;
+      return vt==='days'?v:(v/60).toFixed(2);
+    });
+    return [emp.id,emp.name,emp.group||'',...cells,vt==='days'?tot:(tot/60).toFixed(2)].join(',');
+  });
+  const csv='\uFEFF'+[hdr.join(','),...rows].join('\n');
+  const a=Object.assign(document.createElement('a'),{
+    href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download:`月次集計_${monthlyFY}年度_${vt==='days'?'出勤日数':vt==='work'?'実働時間':'残業時間'}.csv`
+  });
+  a.click(); toast('📥 CSV出力しました');
+}
+
+// ================================================================
+//  残業管理
+// ================================================================
+async function renderOvertimePage() {
+  const periods=getPeriods(otFY);
+  const p=periods[otPIdx]||periods[0];
+  document.getElementById('ot-period-label').textContent=`${otFY}年度 ${p.label}（${p.tip}）`;
+  document.getElementById('ot-range').textContent=p.tip;
+  const otLimit=(MC.otLimit||45)*60;
+  document.getElementById('ot-limit-label').textContent=`上限: ${MC.otLimit||45}h`;
+
+  await ensureSheets([p.start.slice(0,7),p.end.slice(0,7)]);
+  const stats=employees.map(emp=>({ ...emp, ...aggPeriod(emp.id,p.start,p.end) }));
+
+  const totalOt=stats.reduce((s,e)=>s+e.otM,0);
+  const overCnt=stats.filter(e=>e.otM>=otLimit).length;
+  document.getElementById('ot-sum').textContent=m2hm(totalOt);
+  document.getElementById('ot-avg').textContent=`平均 ${m2hm(Math.round(totalOt/employees.length))} / 人`;
+  document.getElementById('ot-over').textContent=overCnt;
+
+  // アラートリスト（70%以上）
+  const alerts=[...stats].filter(e=>e.otM>=otLimit*.7).sort((a,b)=>b.otM-a.otM);
+  document.getElementById('ot-alert-tbody').innerHTML=alerts.length?alerts.map(e=>{
+    const cls=e.otM>=otLimit?'t-danger':'t-warn';
+    return `<tr>
+      <td><strong>${e.name}</strong></td>
+      <td><span class="gbadge">${e.group||'—'}</span></td>
+      <td class="r ${e.otM>=otLimit?'c-danger-cell':'c-warn-cell'}">${m2hm(e.otM)}</td>
+      <td><span class="tag ${cls}">${e.otM>=otLimit?'超過':'注意'}</span></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:16px">アラートなし ✅</td></tr>';
+
+  // 全員詳細
+  const sorted=[...stats].sort((a,b)=>b.otM-a.otM);
+  document.getElementById('ot-detail-tbody').innerHTML=sorted.map(e=>{
+    const pct=Math.min(100,Math.round(e.otM/otLimit*100));
+    const cls=e.otM>=otLimit?'danger':e.otM>=otLimit*.8?'warn':'ok';
+    const tCls={ok:'t-ok',warn:'t-warn',danger:'t-danger'}[cls];
+    return `<tr>
+      <td style="color:#8b949e;font-size:11px">${e.id}</td>
+      <td><strong>${e.name}</strong></td>
+      <td><span class="gbadge">${e.group||'—'}</span></td>
+      <td class="r">${e.days}日</td>
+      <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
+      <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">
+        <div class="ot-wrap" style="justify-content:flex-end">
+          <div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div>
+          ${m2hm(e.otM)}
+        </div>
+      </td>
+      <td><span style="font-size:10px;color:#8b949e">${pct}%</span></td>
+      <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ランキングチャート（上位15名）
+  const top=sorted.slice(0,15);
+  const limitH=MC.otLimit||45;
+  if (chRank) chRank.destroy();
+  chRank=new Chart(document.getElementById('ch-ot-rank'),{
+    type:'bar',
+    data:{ labels:top.map(e=>e.name), datasets:[
+      { label:'残業(h)', data:top.map(e=>parseFloat((e.otM/60).toFixed(1))),
+        backgroundColor:top.map(e=>e.otM>=otLimit?'rgba(248,81,73,.8)':e.otM>=otLimit*.8?'rgba(210,153,34,.8)':'rgba(63,185,80,.8)'),
+        borderRadius:3 },
+      { label:`上限 ${limitH}h`, data:top.map(()=>limitH),
+        type:'line', borderColor:'rgba(255,255,255,.25)', borderDash:[4,4], pointRadius:0, fill:false }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'}, beginAtZero:true },
+        y:{ grid:{color:'#21262d'}, ticks:{color:'#cdd9e5',font:{size:11}} }
+      }
+    }
+  });
+}
+function changeOtPeriod(delta) {
+  otPIdx+=delta;
+  if (otPIdx<0){ otFY--; otPIdx=11; }
+  else if (otPIdx>=12){ otFY++; otPIdx=0; }
+  renderOvertimePage();
+}
+
+// ================================================================
+//  個人詳細
+// ================================================================
+function initIndPage() {
+  const sel=document.getElementById('ind-sel');
+  if (sel.options.length<=1) {
+    employees.forEach(e=>{
+      const opt=document.createElement('option');
+      opt.value=e.id;
+      opt.textContent=`${e.name}（${e.group||'—'}）`;
+      sel.appendChild(opt);
+    });
+  }
+  document.getElementById('ind-fy-label').textContent=`${indFY}年度`;
+  if (sel.value) renderIndividualPage();
+}
+async function renderIndividualPage() {
+  const empId=document.getElementById('ind-sel').value;
+  if (!empId){ document.getElementById('ind-content').innerHTML='<div style="text-align:center;padding:80px;color:#8b949e">↑ 社員を選択してください</div>'; return; }
+  const emp=employees.find(e=>e.id===empId);
+  document.getElementById('ind-fy-label').textContent=`${indFY}年度`;
+  document.getElementById('ind-content').innerHTML='<div style="text-align:center;padding:40px;color:#8b949e">読み込み中...</div>';
+
+  const periods=getPeriods(indFY);
+  await ensureSheets(sheetsFor(periods));
+  const otLimit=(MC.otLimit||45)*60;
+  const pst=periods.map(p=>({ ...p, ...aggPeriod(empId,p.start,p.end) }));
+
+  const totDays=pst.reduce((s,p)=>s+p.days,0);
+  const totWork=pst.reduce((s,p)=>s+p.workM,0);
+  const totOt  =pst.reduce((s,p)=>s+p.otM,0);
+  const maxOtP =pst.reduce((a,b)=>a.otM>b.otM?a:b);
+
+  let html=`
+  <div class="card-row cols-4" style="margin-bottom:18px">
+    <div class="card"><h3>${emp.name}（${emp.group||'—'}）</h3><div class="card-val c-blue">${empId}</div></div>
+    <div class="card"><h3>年間出勤日数</h3><div class="card-val">${totDays}日</div></div>
+    <div class="card"><h3>年間実働時間</h3><div class="card-val">${totWork>0?m2hm(totWork):'—'}</div></div>
+    <div class="card"><h3>年間残業時間</h3><div class="card-val c-yellow">${totOt>0?m2hm(totOt):'—'}</div></div>
+  </div>
+  <div class="tbl-card">
+    <div class="tbl-hdr">
+      <h3>📆 ${indFY}年度 月別サマリー</h3>
+      <span style="font-size:11px;color:#8b949e">最多残業月: ${maxOtP.otM>0?maxOtP.label+'（'+m2hm(maxOtP.otM)+'）':'データなし'}</span>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r">残業時間</th><th>上限比</th><th>状況</th></tr></thead>
+      <tbody>`;
+  pst.forEach(p=>{
+    const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
+    const tCls={ok:'t-ok',warn:'t-warn',danger:'t-danger'}[cls];
+    const pct=otLimit>0?Math.min(100,Math.round(p.otM/otLimit*100)):0;
+    html+=`<tr>
+      <td style="font-weight:600">${p.label}</td>
+      <td style="color:#8b949e;font-size:11px">${p.tip}</td>
+      <td class="r">${p.days>0?p.days+'日':'—'}</td>
+      <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
+      <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">${p.otM>0?m2hm(p.otM):'—'}</td>
+      <td><div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div><span style="font-size:11px;color:#8b949e">${pct}%</span></div></td>
+      <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  document.getElementById('ind-content').innerHTML=html;
+}
+function changeIndFY(d){ indFY+=d; renderIndividualPage(); }
+
+// ================================================================
+//  設定画面
+// ================================================================
+function openSettings() {
+  const sp=loadSpCfg()||{}, mc=loadMainCfg();
+  document.getElementById('cfg-client-id').value  =sp.clientId  ||'';
+  document.getElementById('cfg-tenant-id').value  =sp.tenantId  ||'';
+  document.getElementById('cfg-sp-host').value    =sp.spHost    ||'';
+  document.getElementById('cfg-site-path').value  =sp.sitePath  ||'';
+  document.getElementById('cfg-master-path').value=sp.masterPath||'勤怠管理/社員マスタ.xlsx';
+  document.getElementById('cfg-data-path').value  =sp.dataPath  ||'勤怠管理/勤怠データ.xlsx';
+  document.getElementById('cfg-work-start').value =mc.workStart ||'08:30';
+  document.getElementById('cfg-work-end').value   =mc.workEnd   ||'17:00';
+  document.getElementById('cfg-break-start').value=mc.breakStart||'12:00';
+  document.getElementById('cfg-break-end').value  =mc.breakEnd  ||'12:45';
+  document.getElementById('cfg-ot-limit').value   =mc.otLimit   ||45;
+  showScreen('setup');
+}
+async function saveConfigAndStart() {
+  const sp={
+    clientId:   document.getElementById('cfg-client-id').value.trim(),
+    tenantId:   document.getElementById('cfg-tenant-id').value.trim(),
+    spHost:     document.getElementById('cfg-sp-host').value.trim(),
+    sitePath:   document.getElementById('cfg-site-path').value.trim(),
+    masterPath: document.getElementById('cfg-master-path').value.trim(),
+    dataPath:   document.getElementById('cfg-data-path').value.trim(),
+  };
+  if (!sp.clientId||!sp.tenantId||!sp.spHost||!sp.sitePath){ alert('必須項目を入力してください'); return; }
+  const mc={
+    workStart:  document.getElementById('cfg-work-start').value||'08:30',
+    workEnd:    document.getElementById('cfg-work-end').value  ||'17:00',
+    breakStart: document.getElementById('cfg-break-start').value||'12:00',
+    breakEnd:   document.getElementById('cfg-break-end').value  ||'12:45',
+    otLimit:    parseInt(document.getElementById('cfg-ot-limit').value)||45,
+  };
+  saveAllCfg(sp,mc);
+  await startApp(sp,mc);
+}
+
+// ================================================================
+//  時計
+// ================================================================
+function updateClock(){ document.getElementById('header-clock').textContent=new Date().toTimeString().slice(0,8); }
+
+// ================================================================
+//  起動
+// ================================================================
+async function startApp(spCfg, mc) {
+  MC=mc;
+  showScreen('loading'); setLoading('Microsoft 365 に接続中...');
+  try {
+    await initMsal(spCfg);     setLoading('認証中...');
+    await getToken();           setLoading('SharePointに接続中...');
+    await initSP(spCfg);        setLoading('社員データを読み込み中...');
+    employees=await loadEmployees();
+    showScreen('main');
+    showPage('dashboard');
+  } catch(e) {
+    console.error(e);
+    alert('接続に失敗しました。\n\n'+e.message+'\n\n設定を確認してください。');
+    showScreen('setup');
+  }
+}
+
+// ================================================================
+//  初期化
+// ================================================================
+document.getElementById('current-url').textContent=location.href.split('?')[0].split('#')[0];
+updateClock(); setInterval(updateClock, 1000);
+
+if (new URLSearchParams(location.search).has('reset')) {
+  localStorage.removeItem(CONFIG_KEY);
+  history.replaceState(null,'',location.pathname);
+}
+
+const spCfg=loadSpCfg();
+if (!spCfg||!spCfg.clientId) showScreen('setup');
+else startApp(spCfg, loadMainCfg());
+</script>
+</body>
+</html>
