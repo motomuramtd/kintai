@@ -137,6 +137,25 @@
     .edit-row-btn{background:#1a4a7a;border:1px solid #2a5a8a;color:#adf;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;white-space:nowrap}
     .edit-row-btn:hover{background:#2a5a8a}
 
+    /* ===== ダッシュボード ===== */
+    .dash-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .dash-fy-nav{display:flex;align-items:center;gap:16px;padding:10px 20px;background:#0a2540;border-bottom:1px solid #1a4a7a;flex-shrink:0}
+    .dash-fy-nav span{font-size:15px;font-weight:700;color:#fff}
+    .dash-fy-btn{background:#1a4a7a;border:1px solid #2a5a8a;color:#ccc;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+    .dash-fy-btn:hover{background:#2a5a8a;color:#fff}
+    .dash-table-wrap{flex:1;overflow:auto;padding:12px 20px}
+    .dash-tbl{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%}
+    .dash-tbl th{background:#0a2540;padding:7px 12px;text-align:center;position:sticky;top:0;white-space:nowrap;border:1px solid #1a3a5a;z-index:1}
+    .dash-tbl td{padding:5px 10px;border:1px solid #1a1a3a;text-align:center;white-space:nowrap}
+    .dash-tbl .name-cell{text-align:left;position:sticky;left:0;background:#16213e;z-index:1;min-width:110px;padding-left:12px}
+    .dash-tbl thead .name-cell{z-index:3}
+    .dash-tbl .count-row td,.dash-tbl .count-row th{background:#0f3460;font-weight:700;color:#fff;position:sticky;top:52px}
+    .dash-tbl .count-row .name-cell{background:#0f3460;z-index:3}
+    .dash-present{background:#1d4a2a;color:#7fffb0 !important}
+    .dash-absent{color:#3a3a5a}
+    .group-badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:8px;background:#1a3a5a;color:#7ab;margin-left:5px;vertical-align:middle}
+    .dash-tab-active{background:#3498db !important;border-color:#3498db !important;color:#fff !important}
+
     /* エラー表示 */
     .error-banner{background:#4a1a1a;color:#ff9999;padding:10px 16px;font-size:14px;display:none;flex-shrink:0}
 
@@ -203,6 +222,7 @@
       <div id="date-display" style="font-size:13px;color:#aaa;text-align:right;margin-bottom:2px"></div>
       <div class="header-actions" style="margin-top:6px">
         <button class="hdr-btn" onclick="refreshData()">🔄 更新</button>
+        <button class="hdr-btn" onclick="openDashboard()">📊 分析</button>
         <button class="hdr-btn" onclick="openAdmin()">📋 管理</button>
         <button class="hdr-btn" onclick="openSettings()">⚙️</button>
         <button class="hdr-btn red" onclick="signOut()">ログアウト</button>
@@ -280,6 +300,33 @@
     <div style="margin-top:10px;text-align:center">
       <button class="modal-btn btn-cancel" style="font-size:14px;padding:10px 24px" onclick="closeEditModal()">キャンセル</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== ダッシュボード ===== -->
+<div class="admin-overlay" id="dashboard-panel">
+  <div class="admin-header">
+    <h2>📊 分析ダッシュボード</h2>
+    <div class="admin-tools">
+      <button class="hdr-btn" id="dash-tab-weekly"  onclick="switchDashTab('weekly')">📅 週間</button>
+      <button class="hdr-btn" id="dash-tab-monthly" onclick="switchDashTab('monthly')">📆 月別</button>
+      <button class="admin-close" onclick="closeDashboard()">✕ 閉じる</button>
+    </div>
+  </div>
+
+  <!-- 週間タブ -->
+  <div id="dash-weekly" class="dash-content">
+    <div id="dash-weekly-wrap" class="dash-table-wrap"></div>
+  </div>
+
+  <!-- 月別タブ -->
+  <div id="dash-monthly" class="dash-content" style="display:none">
+    <div class="dash-fy-nav">
+      <button class="dash-fy-btn" onclick="changeFiscalYear(-1)">◀ 前年度</button>
+      <span id="dash-fy-label">2025年度</span>
+      <button class="dash-fy-btn" onclick="changeFiscalYear(1)">次年度 ▶</button>
+    </div>
+    <div id="dash-monthly-wrap" class="dash-table-wrap"></div>
   </div>
 </div>
 
@@ -449,7 +496,7 @@ async function loadEmployees() {
   const rows = range.values || [];
   return rows.slice(1)
     .filter(r => r[0] && r[1])
-    .map(r => ({ id: String(r[0]).trim(), name: String(r[1]).trim() }));
+    .map(r => ({ id: String(r[0]).trim(), name: String(r[1]).trim(), group: r[2] ? String(r[2]).trim() : '' }));
 }
 
 // 今日の勤怠データ読み込み
@@ -1077,6 +1124,204 @@ async function refreshData() {
   } catch(e) {
     showError('更新失敗: ' + e.message);
   }
+}
+
+// ================================================================
+//  ダッシュボード
+// ================================================================
+let dashFiscalYear = 0;
+let dashActiveTab  = 'weekly';
+let dashDataCache  = {}; // { 'YYYY-MM': { 'YYYY-MM-DD': { empId: [{type,time}] } } }
+
+function getCurrentFiscalYear() {
+  const m = new Date().getMonth() + 1; // 1-12
+  const y = new Date().getFullYear();
+  return m >= 10 ? y : y - 1;
+}
+
+async function openDashboard() {
+  dashFiscalYear = getCurrentFiscalYear();
+  document.getElementById('dashboard-panel').classList.add('show');
+  switchDashTab('weekly');
+}
+function closeDashboard() {
+  document.getElementById('dashboard-panel').classList.remove('show');
+}
+
+function switchDashTab(tab) {
+  dashActiveTab = tab;
+  document.getElementById('dash-weekly').style.display  = tab === 'weekly'  ? 'flex' : 'none';
+  document.getElementById('dash-monthly').style.display = tab === 'monthly' ? 'flex' : 'none';
+  document.getElementById('dash-tab-weekly').className  = 'hdr-btn' + (tab === 'weekly'  ? ' dash-tab-active' : '');
+  document.getElementById('dash-tab-monthly').className = 'hdr-btn' + (tab === 'monthly' ? ' dash-tab-active' : '');
+  if (tab === 'weekly')  renderWeeklyDash();
+  else                   renderMonthlyDash();
+}
+
+async function changeFiscalYear(delta) {
+  dashFiscalYear += delta;
+  await renderMonthlyDash();
+}
+
+// シートデータをキャッシュに読み込む（未取得分のみ）
+async function ensureSheetsLoaded(sheetNames) {
+  const toLoad = sheetNames.filter(s => dashDataCache[s] === undefined);
+  if (!toLoad.length) return;
+  await Promise.all(toLoad.map(async sn => {
+    try {
+      const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sn}')/usedRange`);
+      const byDate = {};
+      (range.values || []).slice(1).forEach(row => {
+        if (!row[0]) return;
+        const d   = String(row[0]).slice(0, 10);
+        const eid = String(row[1]);
+        if (!byDate[d])      byDate[d]      = {};
+        if (!byDate[d][eid]) byDate[d][eid] = [];
+        byDate[d][eid].push({ type: String(row[3]), time: String(row[4]) });
+      });
+      dashDataCache[sn] = byDate;
+    } catch(e) {
+      dashDataCache[sn] = {}; // シート未作成など
+    }
+  }));
+}
+
+function getDayRecs(dateStr) {
+  const sn = dateStr.slice(0, 7);
+  return (dashDataCache[sn] || {})[dateStr] || {};
+}
+
+// ──── 週間ビュー ────
+async function renderWeeklyDash() {
+  const wrap = document.getElementById('dash-weekly-wrap');
+  wrap.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:15px">読み込み中...</div>';
+
+  // 直近7日
+  const dates = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(d.toLocaleDateString('sv'));
+  }
+  const sheets = [...new Set(dates.map(d => d.slice(0, 7)))];
+  await ensureSheetsLoaded(sheets);
+
+  const days = ['日','月','火','水','木','金','土'];
+
+  let html = '<table class="dash-tbl"><thead>';
+
+  // 日付ヘッダー行
+  html += '<tr><th class="name-cell">氏名</th>';
+  dates.forEach(d => {
+    const dow = new Date(d + 'T00:00:00').getDay();
+    const wend = dow === 0 || dow === 6;
+    html += `<th style="${wend ? 'color:#f39c12' : ''}">${d.slice(5).replace('-','/')}<br><span style="font-size:10px;opacity:.7">(${days[dow]})</span></th>`;
+  });
+  html += '</tr>';
+
+  // 出勤人数行
+  html += '<tr class="count-row"><td class="name-cell">出勤人数</td>';
+  dates.forEach(d => {
+    const recs = getDayRecs(d);
+    const cnt  = employees.filter(e => (recs[e.id]||[]).some(r => r.type === '出勤')).length;
+    html += `<td>${cnt > 0 ? cnt + '名' : '—'}</td>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  // 社員行
+  employees.forEach(emp => {
+    const gb = emp.group ? `<span class="group-badge">${emp.group}</span>` : '';
+    html += `<tr><td class="name-cell">${emp.name}${gb}</td>`;
+    dates.forEach(d => {
+      const empRecs = (getDayRecs(d)[emp.id] || []);
+      const ci = empRecs.find(r => r.type === '出勤');
+      html += ci
+        ? `<td class="dash-present">${ci.time.slice(0,5)}</td>`
+        : `<td class="dash-absent">—</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ──── 月別ビュー（会計年度 10月〜9月、20日締め）────
+async function renderMonthlyDash() {
+  const wrap = document.getElementById('dash-monthly-wrap');
+  document.getElementById('dash-fy-label').textContent =
+    `${dashFiscalYear}年度（${dashFiscalYear}/10〜${dashFiscalYear+1}/9）`;
+  wrap.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:15px">読み込み中...</div>';
+
+  // 12期間を生成（p=0:10月, p=1:11月, ..., p=2:12月, p=3:1月, ..., p=11:9月）
+  const periods = [];
+  for (let p = 0; p < 12; p++) {
+    const endMonth = ((p + 9) % 12) + 1; // 0→10, 1→11, 2→12, 3→1, ..., 11→9
+    const endYear  = p <= 2 ? dashFiscalYear : dashFiscalYear + 1;
+    let startMonth = endMonth - 1;
+    let startYear  = endYear;
+    if (startMonth === 0) { startMonth = 12; startYear--; }
+    const start = `${startYear}-${String(startMonth).padStart(2,'0')}-21`;
+    const end   = `${endYear}-${String(endMonth).padStart(2,'0')}-20`;
+    const tip   = `${startYear}/${startMonth}/21〜${endYear}/${endMonth}/20`;
+    periods.push({ label: `${endMonth}月`, tip, start, end });
+  }
+
+  // 必要なシートを一括読み込み
+  const sheetSet = new Set();
+  periods.forEach(p => { sheetSet.add(p.start.slice(0,7)); sheetSet.add(p.end.slice(0,7)); });
+  await ensureSheetsLoaded([...sheetSet]);
+
+  // 期間ごとの出勤日数を集計
+  const periodStats = periods.map(p => {
+    const empDays = {};
+    let d = new Date(p.start + 'T00:00:00');
+    const endD = new Date(p.end + 'T00:00:00');
+    while (d <= endD) {
+      const ds = d.toLocaleDateString('sv');
+      const dayRecs = getDayRecs(ds);
+      employees.forEach(emp => {
+        if ((dayRecs[emp.id]||[]).some(r => r.type === '出勤')) {
+          empDays[emp.id] = (empDays[emp.id] || 0) + 1;
+        }
+      });
+      d.setDate(d.getDate() + 1);
+    }
+    const total = employees.filter(e => (empDays[e.id]||0) > 0).length;
+    return { ...p, empDays, total };
+  });
+
+  let html = '<table class="dash-tbl"><thead>';
+
+  // ヘッダー（月ラベル）
+  html += '<tr><th class="name-cell">氏名</th>';
+  periodStats.forEach(p => {
+    html += `<th title="${p.tip}">${p.label}<br><span style="font-size:9px;opacity:.6;font-weight:400">${p.tip.replace(/^\d+\//,'')}</span></th>`;
+  });
+  html += '</tr>';
+
+  // 出勤者数行
+  html += '<tr class="count-row"><td class="name-cell">出勤者数</td>';
+  periodStats.forEach(p => {
+    html += `<td>${p.total > 0 ? p.total + '名' : '—'}</td>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  // 社員行
+  employees.forEach(emp => {
+    const gb = emp.group ? `<span class="group-badge">${emp.group}</span>` : '';
+    html += `<tr><td class="name-cell">${emp.name}${gb}</td>`;
+    periodStats.forEach(p => {
+      const days = p.empDays[emp.id] || 0;
+      html += days > 0
+        ? `<td class="dash-present">${days}日</td>`
+        : `<td class="dash-absent">—</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
 }
 
 // ================================================================
