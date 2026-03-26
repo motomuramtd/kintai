@@ -511,6 +511,11 @@ async function ensureMonthSheet(sheetName) {
 // 書き込みを直列化するキュー
 let writeLock = Promise.resolve();
 
+// 次書き込み行のキャッシュ（連続タップ時のstale read競合を防止）
+// { 'YYYY-MM': nextRowNumber }
+// silentRefresh / refreshData 後にリセットし、次回書き込み時に再取得する
+let sheetNextRow = {};
+
 // 通常の1件追記
 async function writeRecord(empId, type, timeStr) {
   const emp = employees.find(e => e.id === empId);
@@ -520,12 +525,21 @@ async function writeRecord(empId, type, timeStr) {
 
   const doWrite = async () => {
     await ensureMonthSheet(sheetName);
-    let nextRow = 2;
-    try {
-      const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/usedRange?$select=address`);
-      const m = range.address.match(/:.*?(\d+)$/);
-      if (m) nextRow = parseInt(m[1]) + 1;
-    } catch(e) { nextRow = 2; }
+
+    // 未キャッシュ時のみSharePointから行数を取得
+    // キャッシュ済みの場合はそのままインクリメント（stale read防止）
+    if (!sheetNextRow[sheetName]) {
+      try {
+        const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/usedRange?$select=address`);
+        const m = range.address.match(/:.*?(\d+)$/);
+        sheetNextRow[sheetName] = m ? parseInt(m[1]) + 1 : 2;
+      } catch(e) {
+        sheetNextRow[sheetName] = 2;
+      }
+    }
+
+    const nextRow = sheetNextRow[sheetName];
+    sheetNextRow[sheetName]++; // 次の書き込みのために即インクリメント
 
     await gPatch(
       `/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A${nextRow}:E${nextRow}')`,
@@ -1086,6 +1100,8 @@ async function silentRefresh() {
         todayRecords[emp.id] = fetchedRecs;
       }
     });
+    // 同期完了後に行キャッシュをリセット→次の書き込み時にSPから最新行数を取得
+    delete sheetNextRow[todayStr().slice(0, 7)];
     renderGrid();
     const t = new Date();
     document.getElementById('sync-status').textContent =
@@ -1122,6 +1138,8 @@ async function refreshData() {
         todayRecords[emp.id] = fetchedRecs;
       }
     });
+    // 更新完了後に行キャッシュをリセット
+    delete sheetNextRow[todayStr().slice(0, 7)];
     renderGrid();
     const t = new Date();
     document.getElementById('sync-status').textContent =
