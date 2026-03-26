@@ -1037,9 +1037,9 @@ function updateClock() {
     doAutoLogout(hms);
   }
 
-  // ── 自動更新：60秒ごとにSharePointから最新データを取得 ──
+  // ── 自動更新：30秒ごとにSharePointから最新データを取得 ──
   autoRefreshSec++;
-  if (autoRefreshSec >= 60) {
+  if (autoRefreshSec >= 30) {
     autoRefreshSec = 0;
     silentRefresh();
   }
@@ -1104,7 +1104,24 @@ async function silentRefresh() {
 async function refreshData() {
   showToast('🔄 データを更新中...', '#3498db');
   try {
-    [employees, todayRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
+    const [newEmployees, newRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
+    employees = newEmployees;
+    // silentRefreshと同じく recentWrites ガードを適用
+    // （書き込み直後にSharePointが未反映でも打刻状態を保持）
+    employees.forEach(emp => {
+      if (pendingCards.has(emp.id)) return;
+      const localRecs   = todayRecords[emp.id] || [];
+      const fetchedRecs = newRecords[emp.id]   || [];
+      if (recentWrites[emp.id]) {
+        if (fetchedRecs.length >= localRecs.length) {
+          delete recentWrites[emp.id];
+          todayRecords[emp.id] = fetchedRecs;
+        }
+        // SharePoint未反映ならローカルを保持（上書きしない）
+      } else {
+        todayRecords[emp.id] = fetchedRecs;
+      }
+    });
     renderGrid();
     const t = new Date();
     document.getElementById('sync-status').textContent =
