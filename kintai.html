@@ -1066,6 +1066,7 @@ async function doAutoLogout(timeStr) {
 //  データ更新（手動）
 // ================================================================
 async function refreshData() {
+  if (!confirm('データを更新しますか？\n（未保存の打刻状態はSharePointの内容に置き換わります）')) return;
   showToast('🔄 データを更新中...', '#3498db');
   try {
     [employees, todayRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
