@@ -377,20 +377,29 @@ async function initMsal(cfg) {
     auth:  { clientId: cfg.clientId, authority:`https://login.microsoftonline.com/${cfg.tenantId}`, redirectUri: location.href.split('?')[0].split('#')[0] },
     cache: { cacheLocation:'localStorage', storeAuthStateInCookie:true }
   });
-  const r = await msalInst.handleRedirectPromise();
-  if (r) curAccount = r.account;
+  // PC向けアプリのためポップアップ認証を使用（リダイレクト不要）
+  try { await msalInst.handleRedirectPromise(); } catch(e) { /* 無視 */ }
 }
 async function getToken() {
   const accs = msalInst.getAllAccounts();
-  if (!accs.length) { await msalInst.loginRedirect({ scopes:SCOPES }); return; }
-  curAccount = accs[0];
+  if (!accs.length) {
+    // ポップアップでログイン
+    const result = await msalInst.loginPopup({ scopes:SCOPES });
+    curAccount = result.account;
+  } else {
+    curAccount = accs[0];
+  }
   document.getElementById('sidebar-user-name').textContent = curAccount.name || curAccount.username;
   try { return (await msalInst.acquireTokenSilent({ scopes:SCOPES, account:curAccount })).accessToken; }
-  catch(e) { await msalInst.acquireTokenRedirect({ scopes:SCOPES, account:curAccount }); }
+  catch(e) {
+    // サイレント失敗時もポップアップで再取得
+    const result = await msalInst.acquireTokenPopup({ scopes:SCOPES, account:curAccount });
+    return result.accessToken;
+  }
 }
 function signOut() {
   if (!confirm('ログアウトしますか？')) return;
-  msalInst.logoutRedirect({ account: curAccount });
+  msalInst.logoutPopup({ account: curAccount });
 }
 
 // ================================================================
