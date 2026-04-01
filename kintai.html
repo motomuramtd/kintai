@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>勤怠管理システム</title>
+  <title>実働時間管理システム</title>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -214,7 +214,7 @@
 <!-- ===== メイン画面 ===== -->
 <div id="main-screen">
   <header>
-    <div><h1>⏱ 勤怠管理</h1></div>
+    <div><h1>⏱ 実働時間管理</h1></div>
     <div style="text-align:center">
       <div id="clock">00:00:00</div>
     </div>
@@ -231,6 +231,13 @@
   </header>
 
   <div id="error-banner" class="error-banner"></div>
+
+  <!-- ===== 復元バナー ===== -->
+  <div id="restore-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:#6b3a00;border-bottom:2px solid #f39c12;font-size:13px;color:#fff;flex-shrink:0">
+    <span style="flex:1">⚠️ 前回閉じた時の打刻データ（<strong><span id="restore-count">0</span>件</strong>）が見つかりました。復元しますか？</span>
+    <button onclick="restoreFromBackup()" style="background:#f39c12;border:none;color:#000;padding:5px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🔄 復元する</button>
+    <button onclick="dismissRestore()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:7px;font-size:13px;cursor:pointer">✕ 無視</button>
+  </div>
 
   <div class="legend">
     <div class="legend-item"><div class="legend-dot dot-none"></div>未出勤（タップで出勤）</div>
@@ -336,7 +343,7 @@
 <!-- ===== 管理パネル ===== -->
 <div class="admin-overlay" id="admin-panel">
   <div class="admin-header">
-    <h2>📋 勤怠管理パネル</h2>
+    <h2>📋 管理パネル</h2>
     <div class="admin-tools">
       <input type="date" id="admin-date" onchange="renderAdminTable()">
       <button class="export-btn" onclick="exportCSV()">📥 CSV出力</button>
@@ -555,6 +562,74 @@ async function ensureMonthSheet(sheetName) {
 
 // 書き込みを直列化するキュー
 let writeLock = Promise.resolve();
+
+// ================================================================
+//  localStorage バックアップ・復元
+// ================================================================
+const BK_PREFIX = 'kintai_bk_';
+
+// タップのたびに今日の打刻状態をlocalStorageに保存
+function saveBackup() {
+  try {
+    localStorage.setItem(BK_PREFIX + todayStr(), JSON.stringify(todayRecords));
+    // 3日以上前のバックアップを自動削除
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 3);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(BK_PREFIX) && k.slice(BK_PREFIX.length) < cutoffStr)
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+
+// 起動時：SharePointにないバックアップ記録があれば復元バナーを表示
+function checkBackupRestore() {
+  try {
+    const raw = localStorage.getItem(BK_PREFIX + todayStr());
+    if (!raw) return;
+    const bk = JSON.parse(raw);
+    let missing = 0;
+    for (const [empId, logs] of Object.entries(bk)) {
+      const spLogs = todayRecords[empId] || [];
+      logs.forEach(bl => {
+        if (!spLogs.some(sl => sl.type === bl.type && sl.time === bl.time)) missing++;
+      });
+    }
+    if (missing > 0) {
+      document.getElementById('restore-count').textContent = missing;
+      document.getElementById('restore-banner').style.display = 'flex';
+    }
+  } catch(e) {}
+}
+
+// 「復元する」ボタン：バックアップをtodayRecordsにマージしSharePointへ再書き込み
+async function restoreFromBackup() {
+  try {
+    const bk = JSON.parse(localStorage.getItem(BK_PREFIX + todayStr()));
+    let restored = 0;
+    for (const [empId, logs] of Object.entries(bk)) {
+      const spLogs = todayRecords[empId] || [];
+      const extras = logs.filter(bl => !spLogs.some(sl => sl.type === bl.type && sl.time === bl.time));
+      if (!extras.length) continue;
+      if (!todayRecords[empId]) todayRecords[empId] = [];
+      extras.forEach(l => todayRecords[empId].push(l));
+      todayRecords[empId].sort((a, b) => a.time.localeCompare(b.time));
+      for (const log of extras) {
+        try { await writeRecord(empId, log.type, log.time); } catch(e) {}
+        restored++;
+      }
+    }
+    dismissRestore();
+    renderGrid();
+    showToast(`✅ ${restored}件の打刻データを復元しました`, '#27ae60');
+  } catch(e) {
+    showToast('❌ 復元に失敗しました', '#e74c3c');
+  }
+}
+
+// 「無視」ボタン：バナーを非表示（バックアップは残す）
+function dismissRestore() {
+  document.getElementById('restore-banner').style.display = 'none';
+}
 
 // 次書き込み行のキャッシュ（連続タップ時のstale read競合を防止）
 // { 'YYYY-MM': nextRowNumber }
@@ -789,6 +864,7 @@ async function registerAction(empId, type, timeStr) {
   if (!todayRecords[empId]) todayRecords[empId] = [];
   todayRecords[empId].push({ type, time });
   pendingCards.add(empId);
+  saveBackup(); // ブラウザが閉じられても復元できるようlocalStorageに即保存
   renderGrid();
 
   const colors = { '出勤': '#27ae60', '外出': '#f39c12', '戻り': '#3498db', '退勤': '#e74c3c' };
@@ -1342,6 +1418,7 @@ async function startApp(cfg) {
     todayRecords = await loadTodayRecords();
     showScreen('main');
     renderGrid();
+    checkBackupRestore(); // 前回の未保存データがあれば復元バナーを表示
   } catch(e) {
     console.error(e);
     alert('接続に失敗しました。\n\n' + e.message + '\n\n設定を確認してください。');
