@@ -34,8 +34,8 @@
     #loading-message{font-size:16px;color:#aaa;text-align:center}
 
     /* ===== ヘッダー ===== */
-    #main-screen{flex:1;display:none;flex-direction:column;overflow:hidden}
-    header{background:#16213e;padding:5px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0f3460;flex-shrink:0;gap:10px}
+    #main-screen{flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden}
+    header{background:#16213e;padding:4px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0f3460;flex-shrink:0;gap:10px}
     header h1{font-size:16px;font-weight:700;color:#e94560;letter-spacing:2px;white-space:nowrap}
     #clock{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
     #date-display{font-size:12px;color:#aaa;text-align:right}
@@ -58,8 +58,8 @@
     .stat-item span{color:#fff;font-weight:700}
 
     /* ===== グリッド（13インチタブレット・42名対応: 7列×6行）===== */
-    #grid-container{flex:1;min-height:0;overflow:hidden;padding:6px 8px;display:flex;flex-direction:column}
-    #employee-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,minmax(0,1fr));gap:6px}
+    #grid-container{flex:1;min-height:0;overflow:hidden;padding:4px 6px;display:flex;flex-direction:column}
+    #employee-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,minmax(0,1fr));gap:4px}
 
     /* ===== 社員カード（コンパクト）===== */
     .emp-card{border-radius:9px;padding:7px 4px 5px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent;overflow:hidden}
