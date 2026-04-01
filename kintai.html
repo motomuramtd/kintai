@@ -58,11 +58,11 @@
     .stat-item span{color:#fff;font-weight:700}
 
     /* ===== グリッド（13インチタブレット・42名対応: 7列×6行）===== */
-    #grid-container{flex:1;overflow:hidden;padding:7px 8px;display:flex;flex-direction:column;min-height:0}
-    #employee-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr);gap:7px;flex:1;min-height:0}
+    #grid-container{flex:1;min-height:0;overflow:hidden;padding:6px 8px;display:flex;flex-direction:column}
+    #employee-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,minmax(0,1fr));gap:6px}
 
     /* ===== 社員カード（コンパクト）===== */
-    .emp-card{border-radius:9px;padding:8px 5px 7px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+    .emp-card{border-radius:9px;padding:7px 4px 5px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent;overflow:hidden}
     .emp-card:active{transform:scale(0.93)}
     .emp-card.pending::after{content:'⏳';position:absolute;top:3px;right:4px;font-size:11px}
     .emp-card.out-limit::before{content:'外出上限';position:absolute;top:2px;left:3px;font-size:8px;background:rgba(231,76,60,.7);color:#fff;border-radius:3px;padding:1px 3px}
