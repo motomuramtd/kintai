@@ -232,13 +232,6 @@
 
   <div id="error-banner" class="error-banner"></div>
 
-  <!-- ===== 復元バナー ===== -->
-  <div id="restore-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:#6b3a00;border-bottom:2px solid #f39c12;font-size:13px;color:#fff;flex-shrink:0">
-    <span style="flex:1">⚠️ 前回閉じた時の打刻データ（<strong><span id="restore-count">0</span>件</strong>）が見つかりました。復元しますか？</span>
-    <button onclick="restoreFromBackup()" style="background:#f39c12;border:none;color:#000;padding:5px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🔄 復元する</button>
-    <button onclick="dismissRestore()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:7px;font-size:13px;cursor:pointer">✕ 無視</button>
-  </div>
-
   <div class="legend">
     <div class="legend-item"><div class="legend-dot dot-none"></div>未出勤（タップで出勤）</div>
     <div class="legend-item"><div class="legend-dot dot-in"></div>出勤中（タップで外出/退勤）</div>
@@ -1451,6 +1444,42 @@ if (!cfg || !cfg.clientId) {
 } else {
   startApp(cfg);
 }
+</script>
+
+<!-- ===== 復元バナー（最前面固定）===== -->
+<div id="restore-banner" style="
+  display:none;
+  position:fixed;
+  top:0;left:0;right:0;
+  z-index:600;
+  align-items:center;
+  gap:10px;
+  padding:12px 16px;
+  background:#7d4a00;
+  border-bottom:3px solid #f39c12;
+  font-size:14px;
+  color:#fff;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);
+">
+  <span style="flex:1;line-height:1.4">⚠️ 前回閉じた時の打刻データ（<strong><span id="restore-count">0</span>件</strong>）が見つかりました。復元しますか？</span>
+  <button id="btn-restore" style="
+    background:#f39c12;border:none;color:#000;
+    padding:10px 18px;border-radius:8px;
+    font-size:14px;font-weight:700;cursor:pointer;
+    min-height:44px;touch-action:manipulation;
+  ">🔄 復元する</button>
+  <button id="btn-dismiss-restore" style="
+    background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;
+    padding:10px 14px;border-radius:8px;
+    font-size:14px;cursor:pointer;
+    min-height:44px;touch-action:manipulation;
+  ">✕ 無視</button>
+</div>
+
+<script>
+// 復元バナーのボタンはaddEventListenerで安全に登録（Android対応）
+document.getElementById('btn-restore').addEventListener('click', function() { restoreFromBackup(); });
+document.getElementById('btn-dismiss-restore').addEventListener('click', function() { dismissRestore(); });
 </script>
 </body>
 </html>
