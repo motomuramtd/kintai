@@ -57,27 +57,42 @@
     .stat-item{color:#aaa;white-space:nowrap}
     .stat-item span{color:#fff;font-weight:700}
 
-    /* ===== グリッド（13インチタブレット・42名対応: 7列×6行）===== */
-    #grid-container{flex:1;min-height:0;overflow:hidden;padding:4px 6px;display:flex;flex-direction:column}
-    #employee-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,minmax(0,1fr));gap:4px}
+    /* ===== グリッド（6列×7行 = 42名, 縦長カード対応）===== */
+    #grid-container{overflow:hidden;padding:4px 6px}
+    #employee-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
 
-    /* ===== 社員カード（コンパクト）===== */
-    .emp-card{border-radius:9px;padding:7px 4px 5px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent;overflow:hidden}
+    /* ===== 社員カード（縦長デザイン）===== */
+    .emp-card{
+      border-radius:10px;padding:0;cursor:pointer;
+      transition:transform .1s,box-shadow .1s;user-select:none;
+      position:relative;border:2px solid transparent;overflow:hidden;
+      display:flex;flex-direction:column;
+    }
     .emp-card:active{transform:scale(0.93)}
-    .emp-card.pending::after{content:'⏳';position:absolute;top:3px;right:4px;font-size:11px}
-    .emp-card.out-limit::before{content:'外出上限';position:absolute;top:2px;left:3px;font-size:8px;background:rgba(231,76,60,.7);color:#fff;border-radius:3px;padding:1px 3px}
+    .emp-card.pending::after{content:'⏳';position:absolute;top:3px;right:4px;font-size:10px}
+    .emp-card.out-limit::before{content:'外出上限';position:absolute;top:2px;left:3px;font-size:7px;background:rgba(231,76,60,.7);color:#fff;border-radius:3px;padding:1px 3px;z-index:1}
+    /* カード上部：カラーアクセント帯 */
+    .emp-card-accent{height:5px;flex-shrink:0}
+    /* カード本文エリア */
+    .emp-card-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 4px 5px;gap:3px;overflow:hidden}
+    /* ステータス別カラー */
     .status-none{background:#2c2c54;border-color:#3d3d7a}
+    .status-none .emp-card-accent{background:#3d3d7a}
     .status-none .emp-name{color:#ccc}
-    .status-in{background:linear-gradient(135deg,#1d6b3e,#27ae60);border-color:#2ecc71;box-shadow:0 0 10px rgba(39,174,96,.4)}
+    .status-in{background:linear-gradient(170deg,#1a5c35,#1f7a45);border-color:#2ecc71;box-shadow:0 0 8px rgba(39,174,96,.35)}
+    .status-in .emp-card-accent{background:#2ecc71}
     .status-in .emp-name{color:#fff}
-    .status-out{background:linear-gradient(135deg,#8e5b00,#f39c12);border-color:#f39c12;box-shadow:0 0 10px rgba(243,156,18,.4)}
+    .status-out{background:linear-gradient(170deg,#7a4e00,#c07d00);border-color:#f39c12;box-shadow:0 0 8px rgba(243,156,18,.35)}
+    .status-out .emp-card-accent{background:#f39c12}
     .status-out .emp-name{color:#fff}
-    .status-done{background:#1e1e3a;border-color:#333366;opacity:.7}
-    .status-done .emp-name{color:#777}
-    .emp-id{font-size:10px;color:rgba(255,255,255,.5);margin-bottom:2px}
-    .emp-name{font-size:13px;font-weight:700;margin-bottom:4px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .status-badge{font-size:10px;padding:2px 6px;border-radius:20px;background:rgba(0,0,0,.25);display:inline-block}
-    .emp-time{font-size:10px;color:rgba(255,255,255,.7);margin-top:3px;font-variant-numeric:tabular-nums}
+    .status-done{background:#1a1a32;border-color:#2a2a50;opacity:.75}
+    .status-done .emp-card-accent{background:#333366}
+    .status-done .emp-name{color:#888}
+    /* テキスト要素 */
+    .emp-id{font-size:9px;color:rgba(255,255,255,.45);line-height:1}
+    .emp-name{font-size:13px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
+    .status-badge{font-size:9px;padding:1px 6px;border-radius:20px;background:rgba(0,0,0,.3);display:inline-block;line-height:1.4}
+    .emp-time{font-size:9px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums;line-height:1}
 
     /* ===== モーダル共通 ===== */
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center}
@@ -596,6 +611,13 @@ function checkBackupRestore() {
 
 // 「復元する」ボタン：バックアップをtodayRecordsにマージしSharePointへ再書き込み
 async function restoreFromBackup() {
+  // ローディングオーバーレイを表示して操作をブロック
+  const overlay = document.getElementById('restore-loading-overlay');
+  const btn = document.getElementById('btn-restore');
+  overlay.style.display = 'flex';
+  btn.disabled = true;
+  btn.textContent = '⏳ 復元中...';
+
   try {
     const bk = JSON.parse(localStorage.getItem(BK_PREFIX + todayStr()));
     let restored = 0;
@@ -616,6 +638,10 @@ async function restoreFromBackup() {
     showToast(`✅ ${restored}件の打刻データを復元しました`, '#27ae60');
   } catch(e) {
     showToast('❌ 復元に失敗しました', '#e74c3c');
+  } finally {
+    overlay.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '🔄 復元する';
   }
 }
 
@@ -786,10 +812,13 @@ function renderGrid() {
     card.className = `emp-card status-${st}${pendingCards.has(emp.id) ? ' pending' : ''}${outLimitClass}`;
     card.dataset.id = emp.id;
     card.innerHTML = `
-      <div class="emp-id">${emp.id}</div>
-      <div class="emp-name">${emp.name}</div>
-      <div class="status-badge">${label}</div>
-      <div class="emp-time">${last ? last.type + ' ' + last.time : '—'}</div>
+      <div class="emp-card-accent"></div>
+      <div class="emp-card-body">
+        <div class="emp-id">${emp.id}</div>
+        <div class="emp-name">${emp.name}</div>
+        <div class="status-badge">${label}</div>
+        <div class="emp-time">${last ? last.time : '—'}</div>
+      </div>
     `;
     card.addEventListener('click', () => onCardTap(emp.id));
     grid.appendChild(card);
@@ -1145,6 +1174,35 @@ function showScreen(name) {
 // ================================================================
 let autoLogoutExecutedDate = '';  // 自動退勤を実行した日付
 
+// ================================================================
+//  グリッド高さをJS動的計算（6列×7行=42名を確実に表示）
+// ================================================================
+const GRID_COLS = 6;
+const GRID_ROWS = 7;
+const GRID_GAP  = 4;
+const CARD_MIN_H = 70; // 最低カード高さ(px)
+
+function fitGrid() {
+  const ms = document.getElementById('main-screen');
+  if (!ms || ms.style.display === 'none') return;
+  const header = document.querySelector('header');
+  const legend = document.querySelector('.legend');
+  const gc     = document.getElementById('grid-container');
+  const grid   = document.getElementById('employee-grid');
+  if (!header || !legend || !gc || !grid) return;
+
+  const usedH   = header.offsetHeight + legend.offsetHeight;
+  const padV    = 8; // grid-container padding top+bottom
+  const totalGap = GRID_GAP * (GRID_ROWS - 1);
+  const avail   = window.innerHeight - usedH - padV;
+  const rowH    = Math.max(Math.floor((avail - totalGap) / GRID_ROWS), CARD_MIN_H);
+
+  gc.style.height   = avail + 'px';
+  grid.style.gridTemplateRows = `repeat(${GRID_ROWS}, ${rowH}px)`;
+}
+
+window.addEventListener('resize', fitGrid);
+
 function updateClock() {
   const now = new Date();
   const hms  = now.toTimeString().slice(0, 8);
@@ -1411,6 +1469,7 @@ async function startApp(cfg) {
     todayRecords = await loadTodayRecords();
     showScreen('main');
     renderGrid();
+    fitGrid();           // グリッド高さを動的計算（42名全表示）
     checkBackupRestore(); // 前回の未保存データがあれば復元バナーを表示
   } catch(e) {
     console.error(e);
@@ -1445,6 +1504,23 @@ if (!cfg || !cfg.clientId) {
   startApp(cfg);
 }
 </script>
+
+<!-- ===== 復元中ローディングオーバーレイ ===== -->
+<div id="restore-loading-overlay" style="
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.75);
+  z-index:700;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  color:#fff;
+">
+  <div style="width:48px;height:48px;border:4px solid #1a4a7a;border-top-color:#f39c12;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+  <div style="font-size:18px;font-weight:700">データを復元中です...</div>
+  <div style="font-size:13px;color:#aaa">完了するまでそのままお待ちください</div>
+</div>
 
 <!-- ===== 復元バナー（最前面固定）===== -->
 <div id="restore-banner" style="
