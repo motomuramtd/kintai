@@ -57,42 +57,70 @@
     .stat-item{color:#aaa;white-space:nowrap}
     .stat-item span{color:#fff;font-weight:700}
 
-    /* ===== グリッド（6列×7行 = 42名, 縦長カード対応）===== */
+    /* ===== グリッド（7列×6行 = 42名, 縦長カード対応）===== */
     #grid-container{overflow:hidden;padding:4px 6px}
-    #employee-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+    #employee-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 
     /* ===== 社員カード（縦長デザイン）===== */
     .emp-card{
       border-radius:10px;padding:0;cursor:pointer;
-      transition:transform .1s,box-shadow .1s;user-select:none;
+      transition:transform .12s,box-shadow .12s;user-select:none;
       position:relative;border:2px solid transparent;overflow:hidden;
       display:flex;flex-direction:column;
     }
-    .emp-card:active{transform:scale(0.93)}
-    .emp-card.pending::after{content:'⏳';position:absolute;top:3px;right:4px;font-size:10px}
-    .emp-card.out-limit::before{content:'外出上限';position:absolute;top:2px;left:3px;font-size:7px;background:rgba(231,76,60,.7);color:#fff;border-radius:3px;padding:1px 3px;z-index:1}
-    /* カード上部：カラーアクセント帯 */
-    .emp-card-accent{height:5px;flex-shrink:0}
-    /* カード本文エリア */
-    .emp-card-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 4px 5px;gap:3px;overflow:hidden}
+    .emp-card:active{transform:scale(0.92);opacity:.85}
+    .emp-card.pending::after{content:'⏳';position:absolute;top:3px;right:4px;font-size:10px;z-index:2}
+    .emp-card.out-limit::before{content:'外出上限';position:absolute;top:3px;left:3px;font-size:7px;background:rgba(231,76,60,.8);color:#fff;border-radius:3px;padding:1px 3px;z-index:2}
+
+    /* カード上部カラーライン */
+    .emp-card-accent{height:4px;flex-shrink:0;border-radius:8px 8px 0 0}
+
+    /* カード本文：名前を中央に大きく表示 */
+    .emp-card-body{
+      flex:1;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      padding:3px 5px 4px;overflow:hidden;
+      gap:0;
+    }
+
+    /* 名前エリア：縦方向の中心を占める */
+    .emp-name-wrap{
+      flex:1;display:flex;align-items:center;justify-content:center;
+      width:100%;overflow:hidden;
+    }
+    .emp-name{
+      font-size:14px;font-weight:700;line-height:1.25;
+      text-align:center;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+      width:100%;
+    }
+
+    /* ステータス＋時刻を1行にまとめた下部バー */
+    .emp-bottom{
+      display:flex;align-items:center;justify-content:center;
+      gap:4px;padding:2px 0 0;width:100%;
+      flex-shrink:0;
+    }
+    .status-badge{
+      font-size:9px;padding:1px 5px;border-radius:10px;
+      background:rgba(0,0,0,.3);white-space:nowrap;line-height:1.5;
+    }
+    .emp-time{font-size:9px;color:rgba(255,255,255,.6);font-variant-numeric:tabular-nums;white-space:nowrap}
+    .emp-id{display:none} /* 省スペース化のため非表示 */
+
     /* ステータス別カラー */
-    .status-none{background:#2c2c54;border-color:#3d3d7a}
-    .status-none .emp-card-accent{background:#3d3d7a}
-    .status-none .emp-name{color:#ccc}
-    .status-in{background:linear-gradient(170deg,#1a5c35,#1f7a45);border-color:#2ecc71;box-shadow:0 0 8px rgba(39,174,96,.35)}
+    .status-none{background:#252545;border-color:#383870}
+    .status-none .emp-card-accent{background:#4a4a8a}
+    .status-none .emp-name{color:#bbb}
+    .status-in{background:linear-gradient(160deg,#154d2e,#1e7540);border-color:#27ae60;box-shadow:0 0 10px rgba(39,174,96,.4)}
     .status-in .emp-card-accent{background:#2ecc71}
     .status-in .emp-name{color:#fff}
-    .status-out{background:linear-gradient(170deg,#7a4e00,#c07d00);border-color:#f39c12;box-shadow:0 0 8px rgba(243,156,18,.35)}
+    .status-out{background:linear-gradient(160deg,#6b4200,#b87200);border-color:#e67e22;box-shadow:0 0 10px rgba(230,126,34,.4)}
     .status-out .emp-card-accent{background:#f39c12}
     .status-out .emp-name{color:#fff}
-    .status-done{background:#1a1a32;border-color:#2a2a50;opacity:.75}
-    .status-done .emp-card-accent{background:#333366}
-    .status-done .emp-name{color:#888}
-    /* テキスト要素 */
-    .emp-id{font-size:9px;color:rgba(255,255,255,.45);line-height:1}
-    .emp-name{font-size:13px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
-    .status-badge{font-size:9px;padding:1px 6px;border-radius:20px;background:rgba(0,0,0,.3);display:inline-block;line-height:1.4}
-    .emp-time{font-size:9px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums;line-height:1}
+    .status-done{background:#181830;border-color:#2a2a4a;opacity:.72}
+    .status-done .emp-card-accent{background:#2a2a60}
+    .status-done .emp-name{color:#777}
 
     /* ===== モーダル共通 ===== */
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center}
@@ -814,10 +842,11 @@ function renderGrid() {
     card.innerHTML = `
       <div class="emp-card-accent"></div>
       <div class="emp-card-body">
-        <div class="emp-id">${emp.id}</div>
-        <div class="emp-name">${emp.name}</div>
-        <div class="status-badge">${label}</div>
-        <div class="emp-time">${last ? last.time : '—'}</div>
+        <div class="emp-name-wrap"><div class="emp-name">${emp.name}</div></div>
+        <div class="emp-bottom">
+          <span class="status-badge">${label}</span>
+          <span class="emp-time">${last ? last.time : '—'}</span>
+        </div>
       </div>
     `;
     card.addEventListener('click', () => onCardTap(emp.id));
@@ -1177,10 +1206,10 @@ let autoLogoutExecutedDate = '';  // 自動退勤を実行した日付
 // ================================================================
 //  グリッド高さをJS動的計算（6列×7行=42名を確実に表示）
 // ================================================================
-const GRID_COLS = 6;
-const GRID_ROWS = 7;
-const GRID_GAP  = 4;
-const CARD_MIN_H = 70; // 最低カード高さ(px)
+const GRID_COLS  = 7;
+const GRID_ROWS  = 6;
+const GRID_GAP   = 4;
+const CARD_MIN_H = 60; // 最低カード高さ(px)
 
 function fitGrid() {
   const ms = document.getElementById('main-screen');
@@ -1191,17 +1220,25 @@ function fitGrid() {
   const grid   = document.getElementById('employee-grid');
   if (!header || !legend || !gc || !grid) return;
 
-  const usedH   = header.offsetHeight + legend.offsetHeight;
-  const padV    = 8; // grid-container padding top+bottom
+  // visualViewport.height = Androidナビゲーションバー・Chromeアドレスバーを除いた正確な表示高さ
+  const viewH    = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  const usedH    = header.offsetHeight + legend.offsetHeight;
+  const padV     = 8;  // grid-container padding top+bottom合計
   const totalGap = GRID_GAP * (GRID_ROWS - 1);
-  const avail   = window.innerHeight - usedH - padV;
-  const rowH    = Math.max(Math.floor((avail - totalGap) / GRID_ROWS), CARD_MIN_H);
+  const avail    = viewH - usedH - padV;
+  const rowH     = Math.max(Math.floor((avail - totalGap) / GRID_ROWS), CARD_MIN_H);
 
-  gc.style.height   = avail + 'px';
-  grid.style.gridTemplateRows = `repeat(${GRID_ROWS}, ${rowH}px)`;
+  gc.style.height              = avail + 'px';
+  gc.style.overflow            = 'hidden';
+  grid.style.gridTemplateRows  = `repeat(${GRID_ROWS}, ${rowH}px)`;
 }
 
+// 画面リサイズ・回転・Chromeアドレスバー表示変化すべてに対応
 window.addEventListener('resize', fitGrid);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitGrid);
+  window.visualViewport.addEventListener('scroll', fitGrid);
+}
 
 function updateClock() {
   const now = new Date();
