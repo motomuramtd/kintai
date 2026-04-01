@@ -58,11 +58,11 @@
     .stat-item span{color:#fff;font-weight:700}
 
     /* ===== グリッド（13インチタブレット・42名対応: 7列×6行）===== */
-    #grid-container{flex:1;overflow-y:hidden;padding:7px 8px}
-    #employee-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;height:100%}
+    #grid-container{flex:1;overflow:hidden;padding:7px 8px;display:flex;flex-direction:column;min-height:0}
+    #employee-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr);gap:7px;flex:1;min-height:0}
 
     /* ===== 社員カード（コンパクト）===== */
-    .emp-card{border-radius:9px;padding:8px 5px 7px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent}
+    .emp-card{border-radius:9px;padding:8px 5px 7px;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .1s;user-select:none;position:relative;border:2px solid transparent;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
     .emp-card:active{transform:scale(0.93)}
     .emp-card.pending::after{content:'⏳';position:absolute;top:3px;right:4px;font-size:11px}
     .emp-card.out-limit::before{content:'外出上限';position:absolute;top:2px;left:3px;font-size:8px;background:rgba(231,76,60,.7);color:#fff;border-radius:3px;padding:1px 3px}
@@ -75,7 +75,7 @@
     .status-done{background:#1e1e3a;border-color:#333366;opacity:.7}
     .status-done .emp-name{color:#777}
     .emp-id{font-size:10px;color:rgba(255,255,255,.5);margin-bottom:2px}
-    .emp-name{font-size:13px;font-weight:700;margin-bottom:4px;line-height:1.2}
+    .emp-name{font-size:13px;font-weight:700;margin-bottom:4px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .status-badge{font-size:10px;padding:2px 6px;border-radius:20px;background:rgba(0,0,0,.25);display:inline-block}
     .emp-time{font-size:10px;color:rgba(255,255,255,.7);margin-top:3px;font-variant-numeric:tabular-nums}
 
