@@ -883,18 +883,15 @@ function generatePrintCards() {
     employees.forEach(emp => {
       const card = document.createElement('div');
       card.className = 'qr-card';
-
-      const qrDiv = document.createElement('div');
-      qrDiv.className = 'qr-card-qr';
-      qrDiv.id = `qr-${emp.id}`;
-
-      card.innerHTML = `<div class="qr-card-title">実働時間管理</div>`;
-      card.appendChild(qrDiv);
-      card.innerHTML += `
+      // innerHTML を一度に設定してからqrDivをDOMから取得する
+      card.innerHTML = `
+        <div class="qr-card-title">実働時間管理</div>
+        <div class="qr-card-qr" id="qr-${emp.id}"></div>
         <div class="qr-card-name">${emp.name}</div>
         <div class="qr-card-id">ID: ${emp.id}</div>`;
       container.appendChild(card);
 
+      const qrDiv = card.querySelector(`#qr-${emp.id}`);
       try {
         new QRCode(qrDiv, {
           text: QR_PREFIX + emp.id,
