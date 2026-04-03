@@ -398,31 +398,56 @@ function setLoading(msg) {
 }
 
 // ================================================================
-//  MSAL 認証
+//  MSAL 認証（リダイレクト方式 - Android Chrome ポップアップ不要）
 // ================================================================
 async function initMsal(cfg) {
-  Object.keys(sessionStorage).filter(k=>k.includes('msal')||k.includes('interaction')).forEach(k=>sessionStorage.removeItem(k));
-  Object.keys(localStorage).filter(k=>k.startsWith('msal.')).forEach(k=>localStorage.removeItem(k));
+  // interaction 系の stale state のみ削除（トークンキャッシュは残す）
+  Object.keys(sessionStorage)
+    .filter(k => k.includes('interaction') || k.includes('request'))
+    .forEach(k => sessionStorage.removeItem(k));
+
   msalInst = new msal.PublicClientApplication({
-    auth:  { clientId:cfg.clientId, authority:`https://login.microsoftonline.com/${cfg.tenantId}`, redirectUri: location.href.split('?')[0].split('#')[0] },
-    cache: { cacheLocation:'localStorage', storeAuthStateInCookie:false }
+    auth:  {
+      clientId:    cfg.clientId,
+      authority:   `https://login.microsoftonline.com/${cfg.tenantId}`,
+      redirectUri: location.href.split('?')[0].split('#')[0]
+    },
+    cache: { cacheLocation:'localStorage', storeAuthStateInCookie:true }
   });
 }
 
+// リダイレクト後の処理 → アカウントを返す（なければ null）
+async function handleRedirect() {
+  try {
+    const result = await msalInst.handleRedirectPromise();
+    if (result) { curAccount = result.account; return result.accessToken; }
+  } catch(e) { console.warn('redirect handling:', e); }
+  return null;
+}
+
 async function getAccessToken() {
-  const accs = msalInst.getAllAccounts();
-  if (!accs.length) {
-    const r = await msalInst.loginPopup({ scopes:SCOPES });
-    curAccount = r.account;
-  } else { curAccount = accs[0]; }
-  try { return (await msalInst.acquireTokenSilent({ scopes:SCOPES, account:curAccount })).accessToken; }
-  catch(e) { return (await msalInst.acquireTokenPopup({ scopes:SCOPES, account:curAccount })).accessToken; }
+  if (!curAccount) {
+    const accs = msalInst.getAllAccounts();
+    if (!accs.length) {
+      // ポップアップを使わずリダイレクトでログイン（Android Chrome 対応）
+      await msalInst.loginRedirect({ scopes:SCOPES });
+      return null; // ページ遷移するので以降は実行されない
+    }
+    curAccount = accs[0];
+  }
+  try {
+    return (await msalInst.acquireTokenSilent({ scopes:SCOPES, account:curAccount })).accessToken;
+  } catch(e) {
+    // サイレント取得失敗 → リダイレクトで再取得
+    await msalInst.acquireTokenRedirect({ scopes:SCOPES, account:curAccount });
+    return null;
+  }
 }
 
 async function signOut() {
   if (!confirm('ログアウトしますか？')) return;
   stopCamera();
-  await msalInst.logoutPopup({ account:curAccount });
+  await msalInst.logoutRedirect({ account:curAccount });
 }
 
 // ================================================================
@@ -917,11 +942,23 @@ updateClock();
 // ================================================================
 async function startApp(cfg) {
   showScreen('loading');
-  setLoading('Microsoft 365 に接続中...');
+  setLoading('認証処理中...');
   try {
     await initMsal(cfg);
-    setLoading('認証中...');
-    await getAccessToken();
+
+    // ① リダイレクトログイン後の処理（ページが戻ってきた場合）
+    const redirectToken = await handleRedirect();
+
+    // ② ログイン済みアカウント確認
+    const accs = msalInst.getAllAccounts();
+    if (!accs.length) {
+      // 未ログイン → Microsoftログインページへリダイレクト（ポップアップ不要）
+      setLoading('Microsoftログインページに移動します...');
+      await msalInst.loginRedirect({ scopes:SCOPES });
+      return; // ページ遷移するのでここで終了
+    }
+
+    curAccount = accs[0];
     setLoading('SharePointに接続中...');
     await initSharePoint(cfg);
     setLoading('社員データを読み込み中...');
