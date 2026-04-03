@@ -468,31 +468,42 @@ async function gPatch(path, body) {
 }
 
 async function initSharePoint(cfg) {
-  spHost   = cfg.spHost;
-  sitePath = cfg.sitePath;
-  const site = await gGet(`/sites/${spHost}:${sitePath}`);
+  const site = await gGet(`/sites/${cfg.spHost}:${cfg.sitePath}`);
   const siteId = site.id;
-  const [masterInfo, dataInfo] = await Promise.all([
-    gGet(`/sites/${siteId}/drives`).then(d => {
-      const rootDrive = d.value[0].id;
-      return gGet(`/sites/${siteId}/drive/root:/${cfg.masterPath}`).then(f => ({ driveId: rootDrive, itemId: f.id }));
-    }),
-    gGet(`/sites/${siteId}/drives`).then(d => {
-      const rootDrive = d.value[0].id;
-      return gGet(`/sites/${siteId}/drive/root:/${cfg.dataPath}`).then(f => ({ driveId: rootDrive, itemId: f.id }));
-    })
+
+  async function resolveFile(filePath) {
+    const parts = filePath.split('/');
+    const libraryName = parts[0];
+    const subPath = parts.slice(1).join('/');
+    const { value: drives } = await gGet(`/sites/${siteId}/drives`);
+    const drive = drives.find(d =>
+      d.name === libraryName ||
+      d.webUrl.split('/').pop() === libraryName
+    );
+    if (drive) {
+      const item = await gGet(`/drives/${drive.id}/root:/${subPath}`);
+      return { driveId: drive.id, itemId: item.id };
+    } else {
+      const item = await gGet(`/sites/${siteId}/drive/root:/${filePath}`);
+      return { driveId: item.parentReference.driveId, itemId: item.id };
+    }
+  }
+
+  const [master, data] = await Promise.all([
+    resolveFile(cfg.masterPath),
+    resolveFile(cfg.dataPath)
   ]);
-  masterDriveId = masterInfo.driveId; masterItemId = masterInfo.itemId;
-  dataDriveId   = dataInfo.driveId;   dataItemId   = dataInfo.itemId;
+  masterDriveId = master.driveId; masterItemId = master.itemId;
+  dataDriveId   = data.driveId;   dataItemId   = data.itemId;
 }
 
 // ================================================================
 //  データ読み込み
 // ================================================================
 async function loadEmployees() {
-  const range = await gGet(`/drives/${masterDriveId}/items/${masterItemId}/workbook/worksheets('Sheet1')/usedRange`);
+  const range = await gGet(`/drives/${masterDriveId}/items/${masterItemId}/workbook/worksheets('社員マスタ')/usedRange`);
   return (range.values || []).slice(1)
-    .filter(r => r[0])
+    .filter(r => r[0] && r[1])
     .map(r => ({ id:String(r[0]).trim(), name:String(r[1]).trim(), group: r[2] ? String(r[2]).trim() : '' }));
 }
 
