@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>QR実働時間管理</title>
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+    /* ===== 共通フルスクリーン（セットアップ・ローディング）===== */
+    .fullscreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:500}
+
+    /* ===== セットアップ画面 ===== */
+    #setup-screen{background:#1a1a2e;display:none;overflow-y:auto;align-items:flex-start;padding:20px}
+    .setup-card{background:#16213e;border-radius:16px;padding:28px 32px;width:100%;max-width:560px;margin:auto;border:1px solid #0f3460}
+    .setup-card h1{font-size:22px;margin-bottom:4px;color:#e94560}
+    .setup-card p{color:#aaa;font-size:14px;margin-bottom:24px}
+    .setup-section{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #0f3460}
+    .setup-section:first-of-type{margin-top:0;padding-top:0;border-top:none}
+    .setup-card label{display:block;font-size:13px;color:#ccc;margin-bottom:4px;margin-top:12px}
+    .setup-card input{width:100%;background:#0f3460;border:1px solid #1a4a7a;color:#fff;padding:10px 12px;border-radius:8px;font-size:14px;outline:none}
+    .setup-card input:focus{border-color:#4a9eff}
+    .setup-save-btn{width:100%;margin-top:24px;padding:14px;background:#e94560;border:none;color:#fff;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+    .setup-hint{font-size:12px;color:#666;margin-top:6px;line-height:1.5}
+
+    /* ===== ローディング ===== */
+    #loading-screen{background:rgba(0,0,0,.95);display:none;flex-direction:column;gap:16px}
+    .spinner{width:48px;height:48px;border:4px solid #1a4a7a;border-top-color:#4a9eff;border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #loading-message{font-size:16px;color:#aaa;text-align:center}
+
+    /* ===== メイン画面 ===== */
+    #main-screen{display:none;flex:1;flex-direction:column;overflow:hidden}
+
+    /* ヘッダー */
+    #qr-header{background:rgba(0,0,0,.85);backdrop-filter:blur(10px);padding:6px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1);gap:8px}
+    #qr-header h1{font-size:15px;font-weight:700;color:#4a9eff;white-space:nowrap}
+    #qr-clock{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+    .qr-hdr-actions{display:flex;gap:6px;align-items:center}
+    .qbtn{background:rgba(255,255,255,.1);color:#ddd;border:1px solid rgba(255,255,255,.2);padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;white-space:nowrap;touch-action:manipulation;min-height:36px}
+    .qbtn:hover{background:rgba(255,255,255,.2)}
+    .qbtn.red{background:rgba(231,76,60,.3);border-color:rgba(231,76,60,.5);color:#ff9999}
+
+    /* カメラエリア */
+    #scan-area{flex:1;position:relative;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center}
+    #scan-video{width:100%;height:100%;object-fit:cover;display:block}
+    #proc-canvas{display:none}
+
+    /* スキャンオーバーレイ（ターゲットフレーム）*/
+    #scan-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+    .scan-shade{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+    .scan-target{position:relative;width:260px;height:260px;z-index:1}
+    .scan-target::before,.scan-target::after,.scan-corner-br,.scan-corner-bl{
+      content:'';position:absolute;width:36px;height:36px;border-color:#4af;border-style:solid;
+    }
+    .scan-target::before{top:0;left:0;border-width:4px 0 0 4px;border-radius:4px 0 0 4px}
+    .scan-target::after{top:0;right:0;border-width:4px 4px 0 0;border-radius:0 4px 0 0}
+    .scan-corner-br{bottom:0;right:0;border-width:0 4px 4px 0;border-radius:0 0 4px 0}
+    .scan-corner-bl{bottom:0;left:0;border-width:0 0 4px 4px;border-radius:0 0 0 4px}
+    /* スキャンライン */
+    .scan-line{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#4af,transparent);animation:scanline 2s linear infinite;z-index:2}
+    @keyframes scanline{0%{top:0}50%{top:calc(100% - 3px)}100%{top:0}}
+    .scan-hint{position:absolute;bottom:calc(50% - 160px);color:rgba(255,255,255,.8);font-size:13px;z-index:2;text-shadow:0 1px 4px rgba(0,0,0,.8);white-space:nowrap}
+    #cam-error{position:absolute;bottom:50%;color:#ff9999;font-size:14px;text-align:center;padding:12px;background:rgba(100,0,0,.8);border-radius:8px;max-width:90%;display:none}
+
+    /* 最近のスキャン履歴バー */
+    #recent-bar{background:rgba(0,0,0,.85);backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.1);padding:6px 10px;flex-shrink:0;overflow-x:auto;display:flex;gap:6px;align-items:center;min-height:46px;scrollbar-width:none}
+    #recent-bar::-webkit-scrollbar{display:none}
+    .recent-empty{font-size:12px;color:#555;white-space:nowrap}
+    .ri{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.08);border-radius:20px;padding:3px 10px;white-space:nowrap;flex-shrink:0}
+    .ri-time{font-size:10px;color:#888;font-variant-numeric:tabular-nums}
+    .ri-name{font-size:12px;font-weight:600}
+    .ri-act{font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700}
+
+    /* ===== スキャン結果オーバーレイ（大きなフィードバック）===== */
+    #scan-result{
+      position:fixed;inset:0;z-index:800;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      opacity:0;pointer-events:none;
+      transition:opacity .2s ease;
+    }
+    #scan-result.show{opacity:1;pointer-events:auto}
+    .sr-icon{font-size:72px;line-height:1;margin-bottom:16px;animation:sr-pop .3s ease}
+    .sr-name{font-size:42px;font-weight:900;letter-spacing:2px;margin-bottom:12px;text-shadow:0 2px 12px rgba(0,0,0,.4)}
+    .sr-action-badge{font-size:28px;font-weight:900;padding:8px 40px;border-radius:40px;background:rgba(0,0,0,.3);letter-spacing:6px;margin-bottom:16px}
+    .sr-time{font-size:22px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.8)}
+    @keyframes sr-pop{0%{transform:scale(0.5);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+
+    /* ===== アクションモーダル（出勤中QR） ===== */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:center;justify-content:center}
+    .modal-overlay.show{display:flex}
+    .modal{background:#16213e;border-radius:20px;padding:28px 32px;text-align:center;min-width:320px;max-width:90vw;border:1px solid #0f3460;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+    .modal h2{font-size:24px;margin-bottom:6px;font-weight:900}
+    .modal-status{font-size:14px;color:#aaa;margin-bottom:24px}
+    .modal-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .modal-btn{padding:16px 28px;border:none;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;min-width:120px;transition:transform .1s;touch-action:manipulation;min-height:56px}
+    .modal-btn:active{transform:scale(0.93)}
+    .btn-go-out{background:#f39c12;color:#000}
+    .btn-leave{background:#e74c3c;color:#fff}
+    .btn-cancel{background:#2c3e50;color:#fff}
+    .modal-out-note{font-size:12px;color:#f39c12;margin-top:10px;display:none}
+
+    /* ===== 退勤済モーダル ===== */
+    #done-modal .modal{border-color:#333366}
+    .done-log{font-size:13px;color:#aaa;margin:12px 0;line-height:2;text-align:left}
+
+    /* ===== 管理パネル ===== */
+    .admin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:700;flex-direction:column;overflow:hidden}
+    .admin-overlay.show{display:flex}
+    .admin-header{background:#16213e;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #0f3460;flex-shrink:0}
+    .admin-header h2{font-size:18px;font-weight:700}
+    .admin-close{background:#e94560;border:none;color:#fff;padding:8px 18px;border-radius:8px;font-size:14px;cursor:pointer;touch-action:manipulation}
+    .admin-body{flex:1;overflow-y:auto;padding:16px}
+    .admin-stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+    .stat-box{background:#16213e;border-radius:10px;padding:10px 16px;text-align:center;min-width:80px}
+    .stat-box .sv{font-size:28px;font-weight:900}
+    .stat-box .sk{font-size:11px;color:#aaa}
+    .admin-tbl{width:100%;border-collapse:collapse;font-size:13px}
+    .admin-tbl th{background:#0a2540;padding:8px;text-align:left;color:#aaa;font-weight:600;position:sticky;top:0}
+    .admin-tbl td{padding:7px 8px;border-bottom:1px solid #1a2a3a}
+    .admin-tbl tr:hover td{background:#1a2a3a}
+    .tag{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700}
+    .tag-in{background:#1d6b3e;color:#7dff9e}
+    .tag-out{background:#7a4500;color:#ffd080}
+    .tag-done{background:#1a1a3a;color:#6666aa}
+    .tag-none{background:#222;color:#666}
+
+    /* ===== QRカード印刷画面 ===== */
+    #print-screen{display:none;position:fixed;inset:0;background:#f0f0f0;z-index:700;flex-direction:column;overflow:hidden}
+    #print-screen.show{display:flex}
+    #print-header{background:#1a1a2e;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    #print-header h2{font-size:16px;font-weight:700}
+    #print-header-btns{display:flex;gap:8px}
+    .ph-btn{padding:7px 16px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation}
+    .ph-btn.primary{background:#4a9eff;color:#fff}
+    .ph-btn.cancel{background:#555;color:#fff}
+    #print-cards-wrap{flex:1;overflow-y:auto;padding:12px;background:#f0f0f0}
+    #print-cards{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-start}
+    .qr-card{
+      background:#fff;border-radius:8px;border:2px solid #ddd;
+      width:160px;display:flex;flex-direction:column;align-items:center;
+      padding:10px 8px 8px;gap:4px;
+      box-shadow:0 2px 6px rgba(0,0,0,.12);
+    }
+    .qr-card-title{font-size:9px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+    .qr-card-qr{width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+    .qr-card-name{font-size:13px;font-weight:700;color:#222;text-align:center;line-height:1.3;word-break:break-all;margin-top:4px}
+    .qr-card-id{font-size:10px;color:#888;margin-top:1px}
+    #print-loading{font-size:14px;color:#666;padding:20px;text-align:center}
+
+    /* 印刷時CSS */
+    @media print{
+      body > *{display:none !important}
+      #print-screen{display:flex !important;position:static;background:#fff;overflow:visible}
+      #print-header{display:none !important}
+      #print-cards-wrap{overflow:visible;padding:0;background:#fff}
+      #print-cards{display:grid !important;grid-template-columns:repeat(4,1fr);gap:8px;page-break-inside:avoid}
+      .qr-card{break-inside:avoid;border:1px solid #ccc;box-shadow:none}
+    }
+
+    /* ===== トースト ===== */
+    #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(40px);background:#27ae60;color:#fff;padding:12px 24px;border-radius:30px;font-size:15px;font-weight:700;z-index:900;transition:transform .3s,opacity .3s;opacity:0;white-space:nowrap;pointer-events:none}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    /* ===== 復元 ===== */
+    #restore-loading-overlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;
+      flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff
+    }
+    #restore-banner{
+      display:none;position:fixed;top:0;left:0;right:0;z-index:950;
+      align-items:center;gap:10px;padding:10px 14px;
+      background:#7d4a00;border-bottom:3px solid #f39c12;font-size:13px;color:#fff;
+      box-shadow:0 4px 12px rgba(0,0,0,.4)
+    }
+
+    /* ===== エラーバナー ===== */
+    #error-banner{background:#4a1a1a;color:#ff9999;padding:8px 14px;font-size:13px;display:none;flex-shrink:0}
+  </style>
+</head>
+<body>
+
+<!-- ===== セットアップ画面 ===== -->
+<div class="fullscreen" id="setup-screen">
+  <div class="setup-card">
+    <h1>⚙️ QR実働時間管理 設定</h1>
+    <p>kintai.html と同じ設定を入力してください（共有されます）</p>
+
+    <div class="setup-section">Azure AD</div>
+    <label>テナントID</label>
+    <input type="text" id="cfg-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <label>クライアントID（アプリケーションID）</label>
+    <input type="text" id="cfg-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+
+    <div class="setup-section">SharePoint</div>
+    <label>SharePoint ホスト名</label>
+    <input type="text" id="cfg-sp-host" placeholder="yourcompany.sharepoint.com">
+    <label>サイトパス</label>
+    <input type="text" id="cfg-site-path" placeholder="/sites/yoursite">
+    <label>社員マスタ ファイルパス</label>
+    <input type="text" id="cfg-master-path" placeholder="勤怠管理/社員マスタ.xlsx">
+    <label>勤怠データ ファイルパス</label>
+    <input type="text" id="cfg-data-path" placeholder="勤怠管理/勤怠データ.xlsx">
+
+    <button class="setup-save-btn" onclick="saveSetup()">保存して開始</button>
+    <div class="setup-hint">設定はブラウザに保存されます。kintai.html と同じ設定が既にある場合は自動で読み込まれます。</div>
+  </div>
+</div>
+
+<!-- ===== ローディング画面 ===== -->
+<div class="fullscreen" id="loading-screen">
+  <div class="spinner"></div>
+  <div id="loading-message">読み込み中...</div>
+</div>
+
+<!-- ===== メイン画面 ===== -->
+<div id="main-screen">
+  <!-- ヘッダー -->
+  <div id="qr-header">
+    <h1>📷 QR実働時間管理</h1>
+    <div id="qr-clock">00:00:00</div>
+    <div class="qr-hdr-actions">
+      <button class="qbtn" onclick="openPrint()">🖨️ QRカード</button>
+      <button class="qbtn" onclick="openAdmin()">📋 管理</button>
+      <button class="qbtn" onclick="refreshData()">🔄</button>
+      <button class="qbtn" onclick="openSettings()">⚙️</button>
+      <button class="qbtn red" onclick="signOut()">終了</button>
+    </div>
+  </div>
+
+  <div id="error-banner"></div>
+
+  <!-- カメラスキャンエリア -->
+  <div id="scan-area">
+    <video id="scan-video" playsinline autoplay muted></video>
+    <canvas id="proc-canvas"></canvas>
+
+    <!-- オーバーレイ -->
+    <div id="scan-overlay">
+      <div class="scan-shade"></div>
+      <div class="scan-target">
+        <div class="scan-corner-br"></div>
+        <div class="scan-corner-bl"></div>
+        <div class="scan-line"></div>
+      </div>
+      <div class="scan-hint">QRコードをフレームに合わせてください</div>
+      <div id="cam-error"></div>
+    </div>
+  </div>
+
+  <!-- 最近のスキャン履歴バー -->
+  <div id="recent-bar">
+    <span class="recent-empty">まだスキャンがありません</span>
+  </div>
+</div>
+
+<!-- ===== スキャン結果オーバーレイ ===== -->
+<div id="scan-result">
+  <div class="sr-icon" id="result-icon">✅</div>
+  <div class="sr-name" id="result-name"></div>
+  <div class="sr-action-badge" id="result-action"></div>
+  <div class="sr-time" id="result-time"></div>
+</div>
+
+<!-- ===== アクションモーダル（出勤中） ===== -->
+<div class="modal-overlay" id="action-modal">
+  <div class="modal">
+    <h2 id="modal-name"></h2>
+    <div class="modal-status" id="modal-status"></div>
+    <div class="modal-buttons">
+      <button class="modal-btn btn-go-out" id="btn-go-out" onclick="doAction('外出')">🚶 外出</button>
+      <button class="modal-btn btn-leave" onclick="doAction('退勤')">🏠 退勤</button>
+      <button class="modal-btn btn-cancel" onclick="closeModal()">✕ キャンセル</button>
+    </div>
+    <div class="modal-out-note" id="modal-out-note">⚠️ 外出は1日2回までです</div>
+  </div>
+</div>
+
+<!-- ===== 退勤済モーダル ===== -->
+<div class="modal-overlay" id="done-modal">
+  <div class="modal" id="done-modal-inner">
+    <h2 id="done-name"></h2>
+    <div style="font-size:14px;color:#aaa;margin-bottom:12px">本日の記録</div>
+    <div class="done-log" id="done-log"></div>
+    <button class="modal-btn btn-cancel" onclick="closeDoneModal()" style="margin-top:12px;width:100%">閉じる</button>
+  </div>
+</div>
+
+<!-- ===== 管理パネル ===== -->
+<div class="admin-overlay" id="admin-panel">
+  <div class="admin-header">
+    <h2>📋 本日の出勤状況</h2>
+    <button class="admin-close" onclick="closeAdmin()">✕ 閉じる</button>
+  </div>
+  <div class="admin-body">
+    <div class="admin-stats" id="admin-stats"></div>
+    <table class="admin-tbl">
+      <thead><tr><th>氏名</th><th>出勤</th><th>退勤</th><th>状態</th></tr></thead>
+      <tbody id="admin-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== QRカード印刷画面 ===== -->
+<div id="print-screen">
+  <div id="print-header">
+    <h2>🖨️ QRコードカード</h2>
+    <div id="print-header-btns">
+      <button class="ph-btn primary" onclick="window.print()">🖨️ 印刷する</button>
+      <button class="ph-btn cancel" onclick="closePrint()">✕ 閉じる</button>
+    </div>
+  </div>
+  <div id="print-cards-wrap">
+    <div id="print-loading">QRコードを生成中...</div>
+    <div id="print-cards"></div>
+  </div>
+</div>
+
+<!-- ===== 復元中オーバーレイ ===== -->
+<div id="restore-loading-overlay">
+  <div style="width:48px;height:48px;border:4px solid #1a4a7a;border-top-color:#f39c12;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+  <div style="font-size:18px;font-weight:700">データを復元中です...</div>
+  <div style="font-size:13px;color:#aaa">完了するまでそのままお待ちください</div>
+</div>
+
+<!-- ===== 復元バナー ===== -->
+<div id="restore-banner">
+  <span style="flex:1">⚠️ 前回の打刻データ（<strong><span id="restore-count">0</span>件</strong>）が未保存です。復元しますか？</span>
+  <button id="btn-restore" style="background:#f39c12;border:none;color:#000;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;min-height:40px;touch-action:manipulation">🔄 復元する</button>
+  <button id="btn-dismiss-restore" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 12px;border-radius:7px;font-size:13px;cursor:pointer;min-height:40px;touch-action:manipulation">✕ 無視</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ================================================================
+//  定数・設定
+// ================================================================
+const CONFIG_KEY  = 'kintai_sp_config'; // kintai.html と共有
+const BK_PREFIX   = 'kintai_bk_';
+const QR_PREFIX   = 'KINTAI:';
+const SCOPES      = ['https://graph.microsoft.com/Files.ReadWrite.All','https://graph.microsoft.com/Sites.ReadWrite.All'];
+const RESULT_MS   = 2200; // スキャン結果表示時間
+
+// ================================================================
+//  状態変数
+// ================================================================
+let msalInst     = null;
+let curAccount   = null;
+let spHost       = '', sitePath  = '', masterItemId = '', dataItemId = '', masterDriveId = '', dataDriveId = '';
+let employees    = [];
+let todayRecords = {}; // { empId: [{type,time}] }
+let writeLock    = Promise.resolve();
+let sheetNextRow = {};
+let recentScans  = [];
+let scanning     = false;
+let lastEmpId    = null;
+let lastScanMs   = 0;
+let selectedEmpId = null;
+let videoStream  = null;
+
+// ================================================================
+//  ユーティリティ
+// ================================================================
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function showError(msg) {
+  const b = document.getElementById('error-banner');
+  b.textContent = msg;
+  b.style.display = msg ? 'block' : 'none';
+}
+
+let toastTimer = null;
+function showToast(msg, color='#27ae60') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function showScreen(name) {
+  document.getElementById('setup-screen').style.display   = name==='setup'   ? 'flex' : 'none';
+  document.getElementById('loading-screen').style.display = name==='loading' ? 'flex' : 'none';
+  document.getElementById('main-screen').style.display    = name==='main'    ? 'flex' : 'none';
+}
+
+function setLoading(msg) {
+  document.getElementById('loading-message').textContent = msg;
+}
+
+// ================================================================
+//  MSAL 認証
+// ================================================================
+async function initMsal(cfg) {
+  Object.keys(sessionStorage).filter(k=>k.includes('msal')||k.includes('interaction')).forEach(k=>sessionStorage.removeItem(k));
+  Object.keys(localStorage).filter(k=>k.startsWith('msal.')).forEach(k=>localStorage.removeItem(k));
+  msalInst = new msal.PublicClientApplication({
+    auth:  { clientId:cfg.clientId, authority:`https://login.microsoftonline.com/${cfg.tenantId}`, redirectUri: location.href.split('?')[0].split('#')[0] },
+    cache: { cacheLocation:'localStorage', storeAuthStateInCookie:false }
+  });
+}
+
+async function getAccessToken() {
+  const accs = msalInst.getAllAccounts();
+  if (!accs.length) {
+    const r = await msalInst.loginPopup({ scopes:SCOPES });
+    curAccount = r.account;
+  } else { curAccount = accs[0]; }
+  try { return (await msalInst.acquireTokenSilent({ scopes:SCOPES, account:curAccount })).accessToken; }
+  catch(e) { return (await msalInst.acquireTokenPopup({ scopes:SCOPES, account:curAccount })).accessToken; }
+}
+
+async function signOut() {
+  if (!confirm('ログアウトしますか？')) return;
+  stopCamera();
+  await msalInst.logoutPopup({ account:curAccount });
+}
+
+// ================================================================
+//  SharePoint Graph API
+// ================================================================
+async function gGet(path) {
+  const token = await getAccessToken();
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, { headers:{ Authorization:`Bearer ${token}` } });
+  if (!res.ok) { const e = await res.json().catch(()=>({error:{message:res.statusText}})); throw Object.assign(new Error(e.error?.message||res.statusText),{status:res.status}); }
+  return res.json();
+}
+
+async function gPatch(path, body) {
+  const token = await getAccessToken();
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, { method:'PATCH', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  if (!res.ok) { const e = await res.json().catch(()=>({error:{message:res.statusText}})); throw Object.assign(new Error(e.error?.message||res.statusText),{status:res.status}); }
+  return res.json();
+}
+
+async function initSharePoint(cfg) {
+  spHost   = cfg.spHost;
+  sitePath = cfg.sitePath;
+  const site = await gGet(`/sites/${spHost}:${sitePath}`);
+  const siteId = site.id;
+  const [masterInfo, dataInfo] = await Promise.all([
+    gGet(`/sites/${siteId}/drives`).then(d => {
+      const rootDrive = d.value[0].id;
+      return gGet(`/sites/${siteId}/drive/root:/${cfg.masterPath}`).then(f => ({ driveId: rootDrive, itemId: f.id }));
+    }),
+    gGet(`/sites/${siteId}/drives`).then(d => {
+      const rootDrive = d.value[0].id;
+      return gGet(`/sites/${siteId}/drive/root:/${cfg.dataPath}`).then(f => ({ driveId: rootDrive, itemId: f.id }));
+    })
+  ]);
+  masterDriveId = masterInfo.driveId; masterItemId = masterInfo.itemId;
+  dataDriveId   = dataInfo.driveId;   dataItemId   = dataInfo.itemId;
+}
+
+// ================================================================
+//  データ読み込み
+// ================================================================
+async function loadEmployees() {
+  const range = await gGet(`/drives/${masterDriveId}/items/${masterItemId}/workbook/worksheets('Sheet1')/usedRange`);
+  return (range.values || []).slice(1)
+    .filter(r => r[0])
+    .map(r => ({ id:String(r[0]).trim(), name:String(r[1]).trim(), group: r[2] ? String(r[2]).trim() : '' }));
+}
+
+async function loadTodayRecords() {
+  const today = todayStr();
+  const sheetName = today.slice(0,7);
+  try {
+    const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/usedRange`);
+    const recs = {};
+    (range.values||[]).slice(1).forEach(row => {
+      if (!row[0]) return;
+      if (String(row[0]).slice(0,10) !== today) return;
+      const eid = String(row[1]);
+      if (!recs[eid]) recs[eid] = [];
+      recs[eid].push({ type:String(row[3]), time:String(row[4]) });
+    });
+    return recs;
+  } catch(e) {
+    if (e.status===404) return {};
+    throw e;
+  }
+}
+
+// ================================================================
+//  勤怠ステータス
+// ================================================================
+function getStatus(empId) {
+  const logs = todayRecords[empId] || [];
+  if (!logs.length) return 'none';
+  const last = logs[logs.length-1].type;
+  if (last==='出勤'||last==='戻り') return 'in';
+  if (last==='外出') return 'out';
+  if (last==='退勤') return 'done';
+  return 'none';
+}
+
+function getOutCount(empId) {
+  return (todayRecords[empId]||[]).filter(l=>l.type==='外出').length;
+}
+
+// ================================================================
+//  SharePoint 書き込み
+// ================================================================
+async function ensureMonthSheet(sheetName) {
+  try { await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')`); }
+  catch(e) {
+    if (e.status===404) {
+      await gPatch(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets`, { name:sheetName });
+      await gPatch(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A1:E1')`, { values:[['日付','社員ID','氏名','種別','時刻']] });
+    } else throw e;
+  }
+}
+
+async function writeRecord(empId, type, timeStr) {
+  const emp = employees.find(e=>e.id===empId);
+  const date = todayStr();
+  const time = timeStr || new Date().toTimeString().slice(0,8);
+  const sheetName = date.slice(0,7);
+  const doWrite = async () => {
+    await ensureMonthSheet(sheetName);
+    if (!sheetNextRow[sheetName]) {
+      try {
+        const range = await gGet(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/usedRange?$select=address`);
+        const m = range.address.match(/:.*?(\d+)$/);
+        sheetNextRow[sheetName] = m ? parseInt(m[1])+1 : 2;
+      } catch(e) { sheetNextRow[sheetName]=2; }
+    }
+    const nextRow = sheetNextRow[sheetName]++;
+    await gPatch(`/drives/${dataDriveId}/items/${dataItemId}/workbook/worksheets('${sheetName}')/range(address='A${nextRow}:E${nextRow}')`,
+      { values:[[date, empId, emp?emp.name:empId, type, time]] });
+  };
+  const p = writeLock.then(doWrite);
+  writeLock = p.catch(()=>{});
+  return p;
+}
+
+// ================================================================
+//  localStorage バックアップ・復元
+// ================================================================
+function saveBackup() {
+  try {
+    localStorage.setItem(BK_PREFIX+todayStr(), JSON.stringify(todayRecords));
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-3);
+    const cs = cutoff.toISOString().slice(0,10);
+    Object.keys(localStorage).filter(k=>k.startsWith(BK_PREFIX)&&k.slice(BK_PREFIX.length)<cs).forEach(k=>localStorage.removeItem(k));
+  } catch(e) {}
+}
+
+function checkBackupRestore() {
+  try {
+    const raw = localStorage.getItem(BK_PREFIX+todayStr());
+    if (!raw) return;
+    const bk = JSON.parse(raw);
+    let missing = 0;
+    for (const [empId,logs] of Object.entries(bk)) {
+      const sp = todayRecords[empId]||[];
+      logs.forEach(bl => { if (!sp.some(sl=>sl.type===bl.type&&sl.time===bl.time)) missing++; });
+    }
+    if (missing>0) {
+      document.getElementById('restore-count').textContent = missing;
+      document.getElementById('restore-banner').style.display = 'flex';
+    }
+  } catch(e) {}
+}
+
+async function restoreFromBackup() {
+  const overlay = document.getElementById('restore-loading-overlay');
+  const btn = document.getElementById('btn-restore');
+  overlay.style.display = 'flex';
+  btn.disabled = true; btn.textContent = '⏳ 復元中...';
+  try {
+    const bk = JSON.parse(localStorage.getItem(BK_PREFIX+todayStr()));
+    let restored = 0;
+    for (const [empId,logs] of Object.entries(bk)) {
+      const sp = todayRecords[empId]||[];
+      const extras = logs.filter(bl=>!sp.some(sl=>sl.type===bl.type&&sl.time===bl.time));
+      if (!extras.length) continue;
+      if (!todayRecords[empId]) todayRecords[empId]=[];
+      extras.forEach(l=>todayRecords[empId].push(l));
+      todayRecords[empId].sort((a,b)=>a.time.localeCompare(b.time));
+      for (const log of extras) {
+        try { await writeRecord(empId,log.type,log.time); } catch(e) {}
+        restored++;
+      }
+    }
+    dismissRestore();
+    showToast(`✅ ${restored}件のデータを復元しました`,'#27ae60');
+  } catch(e) { showToast('❌ 復元に失敗しました','#e74c3c'); }
+  finally {
+    overlay.style.display = 'none';
+    btn.disabled = false; btn.textContent = '🔄 復元する';
+  }
+}
+
+function dismissRestore() { document.getElementById('restore-banner').style.display='none'; }
+
+// ================================================================
+//  カメラ・QRスキャン
+// ================================================================
+async function startCamera() {
+  const video = document.getElementById('scan-video');
+  const camErr = document.getElementById('cam-error');
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } }
+    });
+    video.srcObject = videoStream;
+    await video.play();
+    scanning = true;
+    requestAnimationFrame(scanLoop);
+  } catch(e) {
+    camErr.style.display = 'block';
+    camErr.textContent = '⚠️ カメラにアクセスできません: ' + e.message;
+  }
+}
+
+function stopCamera() {
+  scanning = false;
+  if (videoStream) { videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; }
+}
+
+function scanLoop() {
+  if (!scanning) return;
+  const video  = document.getElementById('scan-video');
+  const canvas = document.getElementById('proc-canvas');
+  const ctx    = canvas.getContext('2d', { willReadFrequently:true });
+
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'dontInvert' });
+    if (code?.data?.startsWith(QR_PREFIX)) {
+      const empId = code.data.slice(QR_PREFIX.length);
+      const now = Date.now();
+      if (empId !== lastEmpId || (now-lastScanMs) > 4000) {
+        lastEmpId  = empId;
+        lastScanMs = now;
+        scanning   = false; // ループ停止（処理中）
+        onQRDetected(empId);
+        return;
+      }
+    }
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+function resumeScan(delayMs=300) {
+  setTimeout(() => { scanning=true; requestAnimationFrame(scanLoop); }, delayMs);
+}
+
+// ================================================================
+//  QR検出・打刻処理
+// ================================================================
+function onQRDetected(empId) {
+  const emp = employees.find(e=>e.id===empId);
+  if (!emp) {
+    showToast('⚠️ 未登録のQRコードです','#e74c3c');
+    resumeScan(2000);
+    return;
+  }
+
+  const st = getStatus(emp.id);
+
+  if (st==='none') {
+    registerAction(emp.id, '出勤');
+  } else if (st==='in') {
+    selectedEmpId = emp.id;
+    document.getElementById('modal-name').textContent = emp.name;
+    const logs  = todayRecords[emp.id]||[];
+    const inLog = [...logs].reverse().find(l=>l.type==='出勤'||l.type==='戻り');
+    document.getElementById('modal-status').textContent = `出勤中 ／ ${inLog?inLog.time:''}`;
+    const btnOut = document.getElementById('btn-go-out');
+    const outNote = document.getElementById('modal-out-note');
+    if (getOutCount(emp.id)>=2) { btnOut.disabled=true; outNote.style.display='block'; }
+    else { btnOut.disabled=false; outNote.style.display='none'; }
+    document.getElementById('action-modal').classList.add('show');
+    // モーダルが閉じられるまでスキャン再開しない
+  } else if (st==='out') {
+    registerAction(emp.id, '戻り');
+  } else if (st==='done') {
+    const logs = todayRecords[emp.id]||[];
+    document.getElementById('done-name').textContent = emp.name;
+    document.getElementById('done-log').innerHTML = logs.map(l=>`<span style="color:#888">${l.type}：</span><strong>${l.time}</strong>`).join('<br>');
+    document.getElementById('done-modal').classList.add('show');
+    // モーダルが閉じられたらスキャン再開
+  }
+}
+
+async function registerAction(empId, type) {
+  const emp  = employees.find(e=>e.id===empId);
+  const time = new Date().toTimeString().slice(0,8);
+
+  if (!todayRecords[empId]) todayRecords[empId]=[];
+  todayRecords[empId].push({ type, time });
+  saveBackup();
+
+  showScanResult(emp, type, time);
+  addRecentScan(emp, type, time);
+
+  try { await writeRecord(empId, type, time); }
+  catch(e) {
+    todayRecords[empId].pop();
+    showToast(`⚠️ 保存失敗（${emp.name}）`,'#e74c3c');
+  }
+}
+
+function doAction(type) {
+  closeModal();
+  registerAction(selectedEmpId, type);
+}
+
+function closeModal() {
+  document.getElementById('action-modal').classList.remove('show');
+  resumeScan();
+}
+
+function closeDoneModal() {
+  document.getElementById('done-modal').classList.remove('show');
+  resumeScan();
+}
+
+// ================================================================
+//  スキャン結果オーバーレイ
+// ================================================================
+function showScanResult(emp, action, time) {
+  const bgColors  = { '出勤':'#0d5c2c', '外出':'#7a4500', '戻り':'#0a3d62', '退勤':'#6b1a1a' };
+  const icons     = { '出勤':'✅', '外出':'🚶', '戻り':'🔙', '退勤':'🏠' };
+  const labels    = { '出勤':'出　勤', '外出':'外　出', '戻り':'戻　り', '退勤':'退　勤' };
+
+  const overlay = document.getElementById('scan-result');
+  overlay.style.background = bgColors[action]||'#1a1a2e';
+  document.getElementById('result-icon').textContent   = icons[action]||'✅';
+  document.getElementById('result-name').textContent   = emp.name;
+  document.getElementById('result-action').textContent = labels[action]||action;
+  document.getElementById('result-time').textContent   = time;
+  overlay.classList.add('show');
+
+  setTimeout(() => { overlay.classList.remove('show'); resumeScan(); }, RESULT_MS);
+}
+
+// ================================================================
+//  最近のスキャン履歴
+// ================================================================
+function addRecentScan(emp, action, time) {
+  recentScans.unshift({ empName:emp.name, action, time });
+  if (recentScans.length>10) recentScans.pop();
+  renderRecentScans();
+}
+
+function renderRecentScans() {
+  const bar = document.getElementById('recent-bar');
+  if (!recentScans.length) { bar.innerHTML='<span class="recent-empty">まだスキャンがありません</span>'; return; }
+  const colors = { '出勤':'#27ae60', '外出':'#f39c12', '戻り':'#3498db', '退勤':'#e74c3c' };
+  bar.innerHTML = recentScans.map(s=>`
+    <div class="ri">
+      <span class="ri-time">${s.time.slice(0,5)}</span>
+      <span class="ri-name">${s.empName}</span>
+      <span class="ri-act" style="background:${colors[s.action]||'#555'};color:#fff">${s.action}</span>
+    </div>`).join('');
+}
+
+// ================================================================
+//  管理パネル
+// ================================================================
+function openAdmin() {
+  const stats   = { in:0, out:0, done:0, none:0 };
+  const tbody   = document.getElementById('admin-tbody');
+  tbody.innerHTML = '';
+
+  employees.forEach(emp => {
+    const st   = getStatus(emp.id);
+    const logs = todayRecords[emp.id]||[];
+    stats[st]  = (stats[st]||0)+1;
+
+    const find = t => logs.find(l=>l.type===t)?.time??'—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${emp.name}</strong></td>
+      <td>${find('出勤')}</td>
+      <td>${find('退勤')}</td>
+      <td><span class="tag tag-${st}">${{in:'出勤中',out:'外出中',done:'退勤済',none:'未出勤'}[st]}</span></td>`;
+    tbody.appendChild(tr);
+  });
+
+  const s = document.getElementById('admin-stats');
+  s.innerHTML = [
+    ['出勤中',stats.in,'#27ae60'],['外出中',stats.out,'#f39c12'],
+    ['退勤済',stats.done,'#6666aa'],['未出勤',stats.none,'#555']
+  ].map(([k,v,c])=>`<div class="stat-box"><div class="sv" style="color:${c}">${v}</div><div class="sk">${k}</div></div>`).join('');
+
+  scanning = false; // スキャン停止
+  document.getElementById('admin-panel').classList.add('show');
+}
+
+function closeAdmin() {
+  document.getElementById('admin-panel').classList.remove('show');
+  resumeScan();
+}
+
+// ================================================================
+//  データ更新
+// ================================================================
+async function refreshData() {
+  showToast('🔄 更新中...','#3498db');
+  try {
+    [employees, todayRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
+    delete sheetNextRow[todayStr().slice(0,7)];
+    showToast('✅ 更新完了','#27ae60');
+  } catch(e) { showError('更新失敗: '+e.message); }
+}
+
+// ================================================================
+//  QRカード印刷
+// ================================================================
+function openPrint() {
+  const ps = document.getElementById('print-screen');
+  ps.classList.add('show');
+  scanning = false;
+  generatePrintCards();
+}
+
+function closePrint() {
+  document.getElementById('print-screen').classList.remove('show');
+  resumeScan();
+}
+
+function generatePrintCards() {
+  const container = document.getElementById('print-cards');
+  const loading   = document.getElementById('print-loading');
+  container.innerHTML = '';
+  loading.style.display = 'block';
+
+  // QRコード生成は少し遅延させてDOM更新を待つ
+  setTimeout(() => {
+    employees.forEach(emp => {
+      const card = document.createElement('div');
+      card.className = 'qr-card';
+
+      const qrDiv = document.createElement('div');
+      qrDiv.className = 'qr-card-qr';
+      qrDiv.id = `qr-${emp.id}`;
+
+      card.innerHTML = `<div class="qr-card-title">実働時間管理</div>`;
+      card.appendChild(qrDiv);
+      card.innerHTML += `
+        <div class="qr-card-name">${emp.name}</div>
+        <div class="qr-card-id">ID: ${emp.id}</div>`;
+      container.appendChild(card);
+
+      try {
+        new QRCode(qrDiv, {
+          text: QR_PREFIX + emp.id,
+          width: 120, height: 120,
+          colorDark: '#000000', colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      } catch(e) {
+        qrDiv.textContent = 'QR生成失敗';
+      }
+    });
+    loading.style.display = 'none';
+  }, 100);
+}
+
+// ================================================================
+//  設定画面
+// ================================================================
+function openSettings() {
+  scanning = false;
+  const cfg = JSON.parse(localStorage.getItem(CONFIG_KEY)||'{}');
+  document.getElementById('cfg-tenant-id').value   = cfg.tenantId   ||'';
+  document.getElementById('cfg-client-id').value   = cfg.clientId   ||'';
+  document.getElementById('cfg-sp-host').value     = cfg.spHost     ||'';
+  document.getElementById('cfg-site-path').value   = cfg.sitePath   ||'';
+  document.getElementById('cfg-master-path').value = cfg.masterPath ||'勤怠管理/社員マスタ.xlsx';
+  document.getElementById('cfg-data-path').value   = cfg.dataPath   ||'勤怠管理/勤怠データ.xlsx';
+  showScreen('setup');
+}
+
+function saveSetup() {
+  const cfg = {
+    tenantId:   document.getElementById('cfg-tenant-id').value.trim(),
+    clientId:   document.getElementById('cfg-client-id').value.trim(),
+    spHost:     document.getElementById('cfg-sp-host').value.trim(),
+    sitePath:   document.getElementById('cfg-site-path').value.trim(),
+    masterPath: document.getElementById('cfg-master-path').value.trim(),
+    dataPath:   document.getElementById('cfg-data-path').value.trim(),
+  };
+  if (!cfg.tenantId||!cfg.clientId||!cfg.spHost||!cfg.sitePath) { alert('必須項目を入力してください'); return; }
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+  startApp(cfg);
+}
+
+// ================================================================
+//  時計
+// ================================================================
+function updateClock() {
+  document.getElementById('qr-clock').textContent = new Date().toTimeString().slice(0,8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ================================================================
+//  アプリ起動
+// ================================================================
+async function startApp(cfg) {
+  showScreen('loading');
+  setLoading('Microsoft 365 に接続中...');
+  try {
+    await initMsal(cfg);
+    setLoading('認証中...');
+    await getAccessToken();
+    setLoading('SharePointに接続中...');
+    await initSharePoint(cfg);
+    setLoading('社員データを読み込み中...');
+    employees = await loadEmployees();
+    setLoading('勤怠データを読み込み中...');
+    todayRecords = await loadTodayRecords();
+    showScreen('main');
+    await startCamera();
+    checkBackupRestore();
+  } catch(e) {
+    console.error(e);
+    alert('接続に失敗しました。\n\n'+e.message+'\n\n設定を確認してください。');
+    showScreen('setup');
+  }
+}
+
+// ================================================================
+//  復元ボタン登録（Android対応）
+// ================================================================
+document.getElementById('btn-restore').addEventListener('click', ()=>restoreFromBackup());
+document.getElementById('btn-dismiss-restore').addEventListener('click', ()=>dismissRestore());
+
+// ================================================================
+//  初期化
+// ================================================================
+const cfg = JSON.parse(localStorage.getItem(CONFIG_KEY)||'null');
+if (!cfg||!cfg.clientId) {
+  showScreen('setup');
+} else {
+  startApp(cfg);
+}
+</script>
+</body>
+</html>
