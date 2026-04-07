@@ -551,7 +551,7 @@ async function loadTodayRecords() {
     const recs = {};
     (range.values || []).slice(1).forEach(row => {
       if (!row[0]) return;
-      const d = String(row[0]).slice(0, 10);
+      const d = excelDateStr(row[0]);
       if (d !== today) return;
       const eid = String(row[1]);
       if (!recs[eid]) recs[eid] = [];
@@ -572,7 +572,7 @@ async function loadRecordsByDate(dateStr) {
     const recs = {};
     (range.values || []).slice(1).forEach(row => {
       if (!row[0]) return;
-      const d = String(row[0]).slice(0, 10);
+      const d = excelDateStr(row[0]);
       if (d !== dateStr) return;
       const eid = String(row[1]);
       if (!recs[eid]) recs[eid] = [];
@@ -735,7 +735,7 @@ async function rewriteDayRecords(empId, dateStr, newLogs) {
 
     // 該当社員・該当日のレコードを除外
     const filtered = allRows.filter(row => {
-      const d = String(row[0]).slice(0, 10);
+      const d = excelDateStr(row[0]);
       const eid = String(row[1]);
       return !(d === dateStr && eid === String(empId));
     });
@@ -795,6 +795,15 @@ let selectedEmpId = null;
 
 function todayStr() {
   return new Date().toLocaleDateString('sv');
+}
+
+// Excelシリアル日付値(数値)→ YYYY-MM-DD 文字列に変換
+function excelDateStr(val) {
+  if (typeof val === 'number') {
+    const ms = Math.round((val - 25569) * 86400000);
+    return new Date(ms).toLocaleDateString('sv');
+  }
+  return String(val).slice(0, 10);
 }
 
 function getStatus(empId) {
