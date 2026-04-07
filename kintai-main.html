@@ -460,7 +460,7 @@ async function initSP(cfg) {
 async function loadEmployees() {
   const rng = await gGet(`/drives/${mDriveId}/items/${mItemId}/workbook/worksheets('社員マスタ')/usedRange`);
   return (rng.values||[]).slice(1).filter(r=>r[0]&&r[1])
-    .map(r=>({ id:String(r[0]).trim(), name:String(r[1]).trim(), group:r[2]?String(r[2]).trim():'' }));
+    .map(r=>({ id:String(r[0]).trim().padStart(4,'0'), name:String(r[1]).trim(), group:r[2]?String(r[2]).trim():'' }));
 }
 
 // シートキャッシュ: { 'YYYY-MM': { 'YYYY-MM-DD': { empId:[{type,time}] } } }
@@ -511,8 +511,8 @@ async function _loadSheet(ym) {
   let count = 0;
   rows.forEach(row => {
     if (!row[0]) return;
-    const d   = excelSerialToDateStr(row[0]);  // A列: 日付（シリアル値 or 文字列）
-    const eid = String(row[1]).trim();          // B列: 社員ID
+    const d   = excelSerialToDateStr(row[0]);              // A列: 日付
+    const eid = String(row[1]).trim().padStart(4, '0');   // B列: 社員ID（4桁ゼロ埋め統一）
     // C列(row[2])は氏名 → スキップ
     const typ = String(row[3]).trim();          // D列: 種別（出勤/外出/戻り/退勤）
     const tim = excelSerialToTimeStr(row[4]);   // E列: 時刻（シリアル値 or 文字列）

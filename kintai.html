@@ -539,7 +539,7 @@ async function loadEmployees() {
   const rows = range.values || [];
   return rows.slice(1)
     .filter(r => r[0] && r[1])
-    .map(r => ({ id: String(r[0]).trim(), name: String(r[1]).trim(), group: r[2] ? String(r[2]).trim() : '' }));
+    .map(r => ({ id: String(r[0]).trim().padStart(4, '0'), name: String(r[1]).trim(), group: r[2] ? String(r[2]).trim() : '' }));
 }
 
 // 今日の勤怠データ読み込み
@@ -553,7 +553,7 @@ async function loadTodayRecords() {
       if (!row[0]) return;
       const d = excelDateStr(row[0]);
       if (d !== today) return;
-      const eid = String(row[1]);
+      const eid = String(row[1]).trim().padStart(4, '0');  // 4桁ゼロ埋め統一
       if (!recs[eid]) recs[eid] = [];
       recs[eid].push({ type: String(row[3]), time: excelTimeStr(row[4]) });
     });
@@ -574,7 +574,7 @@ async function loadRecordsByDate(dateStr) {
       if (!row[0]) return;
       const d = excelDateStr(row[0]);
       if (d !== dateStr) return;
-      const eid = String(row[1]);
+      const eid = String(row[1]).trim().padStart(4, '0');  // 4桁ゼロ埋め統一
       if (!recs[eid]) recs[eid] = [];
       recs[eid].push({ type: String(row[3]), time: excelTimeStr(row[4]) });
     });
@@ -736,8 +736,8 @@ async function rewriteDayRecords(empId, dateStr, newLogs) {
     // 該当社員・該当日のレコードを除外
     const filtered = allRows.filter(row => {
       const d = excelDateStr(row[0]);
-      const eid = String(row[1]);
-      return !(d === dateStr && eid === String(empId));
+      const eid = String(row[1]).trim().padStart(4, '0');  // 4桁ゼロ埋め統一
+      return !(d === dateStr && eid === String(empId).padStart(4, '0'));
     });
 
     // 修正後のレコードを追加
@@ -1359,7 +1359,7 @@ async function ensureSheetsLoaded(sheetNames) {
       (range.values || []).slice(1).forEach(row => {
         if (!row[0]) return;
         const d   = excelDateStr(row[0]);
-        const eid = String(row[1]);
+        const eid = String(row[1]).trim().padStart(4, '0');  // 4桁ゼロ埋め統一
         if (!byDate[d])      byDate[d]      = {};
         if (!byDate[d][eid]) byDate[d][eid] = [];
         byDate[d][eid].push({ type: String(row[3]), time: excelTimeStr(row[4]) });
