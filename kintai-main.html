@@ -103,6 +103,19 @@
     .t-muted{background:#21262d;color:#8b949e}
     .gbadge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:#1c2128;color:#7d9ab5;margin-left:4px}
 
+    /* ===== ミニ出勤カード ===== */
+    .mini-card{border-radius:7px;padding:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid #30363d;cursor:default;transition:transform .1s}
+    .mini-card:hover{transform:scale(1.04)}
+    .mini-card-accent{height:3px;flex-shrink:0}
+    .mini-card-body{padding:5px 6px 5px;display:flex;flex-direction:column;align-items:center;gap:2px}
+    .mini-card-name{font-size:11px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+    .mini-card-time{font-size:9px;color:#8b949e}
+    .mini-card-badge{font-size:8px;padding:1px 5px;border-radius:8px;background:rgba(0,0,0,.3);white-space:nowrap}
+    .mc-none{background:#1c2128;border-color:#2a2a4a}.mc-none .mini-card-accent{background:#4a4a8a}.mc-none .mini-card-name{color:#888}
+    .mc-in{background:linear-gradient(160deg,#154d2e,#1e7540);border-color:#27ae60}.mc-in .mini-card-accent{background:#2ecc71}.mc-in .mini-card-name{color:#fff}
+    .mc-out{background:linear-gradient(160deg,#6b4200,#b87200);border-color:#e67e22}.mc-out .mini-card-accent{background:#f39c12}.mc-out .mini-card-name{color:#fff}
+    .mc-done{background:linear-gradient(160deg,#2a0e0e,#4a1515);border-color:#7a2525}.mc-done .mini-card-accent{background:#c0392b}.mc-done .mini-card-name{color:#f0aaaa}
+
     /* ===== OT progress bar ===== */
     .ot-wrap{display:flex;align-items:center;gap:8px}
     .ot-bar{flex:0 0 100px;height:5px;background:#21262d;border-radius:3px;overflow:hidden}
@@ -237,33 +250,36 @@
 
         <!-- ===== Dashboard ===== -->
         <div class="page active" id="page-dashboard">
-          <div class="card-row cols-4" id="dash-cards">
+          <!-- サマリーカード（3枚） -->
+          <div class="card-row cols-3" id="dash-cards">
             <div class="card"><h3>本日の出勤</h3><div class="card-val c-blue" id="d-today">—</div><div class="card-sub" id="d-today-sub">—</div></div>
             <div class="card"><h3>今月の出勤率</h3><div class="card-val c-green" id="d-rate">—</div><div class="card-sub" id="d-rate-sub">—</div></div>
             <div class="card"><h3>今月の残業合計</h3><div class="card-val c-yellow" id="d-ot-total">—</div><div class="card-sub" id="d-ot-sub">—</div></div>
-            <div class="card"><h3>残業アラート</h3><div class="card-val c-red" id="d-alert">—</div><div class="card-sub" id="d-alert-sub">上限超過</div></div>
           </div>
+          <!-- チャート -->
           <div class="card-row cols-2">
             <div class="chart-card">
               <h3>月次残業時間推移（直近6ヶ月・合計）</h3>
               <div class="chart-wrap" style="height:210px"><canvas id="ch-trend"></canvas></div>
             </div>
             <div class="chart-card">
-              <h3>グループ別 今月平均残業時間</h3>
+              <h3>グループ別 今月残業時間合計</h3>
               <div class="chart-wrap" style="height:210px"><canvas id="ch-group"></canvas></div>
             </div>
           </div>
-          <div class="tbl-card">
-            <div class="tbl-hdr">
-              <h3>⏰ 今月の残業ランキング（上位10名）</h3>
+          <!-- 出勤状況グリッド -->
+          <div class="tbl-card" style="padding:14px 16px">
+            <div class="tbl-hdr" style="margin-bottom:10px">
+              <h3>👥 本日の出勤状況</h3>
               <span id="d-period-label" style="font-size:11px;color:#8b949e"></span>
+              <div style="display:flex;gap:12px;margin-left:auto;font-size:11px;color:#8b949e;align-items:center">
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#27ae60;margin-right:4px;vertical-align:middle"></span>出勤中</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f39c12;margin-right:4px;vertical-align:middle"></span>外出中</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:linear-gradient(160deg,#2a0e0e,#4a1515);border:1px solid #7a2525;margin-right:4px;vertical-align:middle"></span>退勤済</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#555;margin-right:4px;vertical-align:middle"></span>未出勤</span>
+              </div>
             </div>
-            <div style="overflow-x:auto">
-              <table class="tbl">
-                <thead><tr><th>#</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r">残業時間</th><th>状況</th></tr></thead>
-                <tbody id="d-rank-tbody"></tbody>
-              </table>
-            </div>
+            <div id="d-emp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px"></div>
           </div>
         </div>
 
@@ -446,24 +462,38 @@ async function loadEmployees() {
 }
 
 // シートキャッシュ: { 'YYYY-MM': { 'YYYY-MM-DD': { empId:[{type,time}] } } }
+// kintai.html は '勤怠データ' シート1枚に全データを書くため、初回に全件読み込む
 const SC = {};
-async function ensureSheets(names) {
-  const todo = names.filter(n => SC[n]===undefined);
-  if (!todo.length) return;
-  await Promise.all(todo.map(async sn => {
+let _scLoaded = false;
+let _scLoading = null;
+
+async function ensureSheets(_names) {
+  // 既にロード済みなら即返す
+  if (_scLoaded) return;
+  // 並行呼び出し対策: 同じPromiseを返す
+  if (_scLoading) return _scLoading;
+  _scLoading = (async () => {
     try {
-      const rng = await gGet(`/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('${sn}')/usedRange`);
-      const byDate = {};
+      const rng = await gGet(`/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('勤怠データ')/usedRange`);
       (rng.values||[]).slice(1).forEach(row => {
         if (!row[0]) return;
-        const d=String(row[0]).slice(0,10), eid=String(row[1]);
-        if (!byDate[d]) byDate[d]={};
-        if (!byDate[d][eid]) byDate[d][eid]=[];
-        byDate[d][eid].push({ type:String(row[3]), time:String(row[4]) });
+        const d   = String(row[0]).slice(0,10);  // A列: YYYY-MM-DD
+        const eid = String(row[1]).trim();        // B列: 社員ID
+        const typ = String(row[2]).trim();        // C列: 種別（出勤/外出/戻り/退勤）
+        const tim = String(row[3]).trim();        // D列: 時刻
+        const ym  = d.slice(0,7);
+        if (!SC[ym])        SC[ym]        = {};
+        if (!SC[ym][d])     SC[ym][d]     = {};
+        if (!SC[ym][d][eid])SC[ym][d][eid]= [];
+        SC[ym][d][eid].push({ type: typ, time: tim });
       });
-      SC[sn] = byDate;
-    } catch(e) { SC[sn]={}; }
-  }));
+      _scLoaded = true;
+    } catch(e) {
+      console.error('ensureSheets error:', e);
+      _scLoading = null; // エラー時はリトライ可能にする
+    }
+  })();
+  return _scLoading;
 }
 function dayRecs(ds, empId) { return ((SC[ds.slice(0,7)]||{})[ds]||{})[empId]||[]; }
 
@@ -618,8 +648,6 @@ async function renderDashboard() {
   // 今月集計
   const stats=employees.map(emp=>({ ...emp, ...aggPeriod(emp.id,cp.start,cp.end) }));
   const totalOt=stats.reduce((s,e)=>s+e.otM,0);
-  const otLimit=(MC.otLimit||45)*60;
-  const alertCnt=stats.filter(e=>e.otM>=otLimit).length;
 
   const maxDays=workdays(cp.start, today<=cp.end?today:cp.end);
   const avgDays=stats.reduce((s,e)=>s+e.days,0)/employees.length;
@@ -628,28 +656,6 @@ async function renderDashboard() {
   document.getElementById('d-rate-sub').textContent=`平均 ${avgDays.toFixed(1)}日 / ${maxDays}日`;
   document.getElementById('d-ot-total').textContent=m2hm(totalOt);
   document.getElementById('d-ot-sub').textContent=`平均 ${m2hm(Math.round(totalOt/employees.length))} / 人`;
-  document.getElementById('d-alert').textContent=alertCnt;
-  document.getElementById('d-alert-sub').textContent=`${MC.otLimit||45}h 超過`;
-
-  // ランキング
-  const ranked=[...stats].sort((a,b)=>b.otM-a.otM).slice(0,10);
-  document.getElementById('d-rank-tbody').innerHTML=ranked.map((e,i)=>{
-    const pct=Math.min(100,Math.round(e.otM/otLimit*100));
-    const cls=e.otM>=otLimit?'danger':e.otM>=otLimit*.8?'warn':'ok';
-    const tCls={ok:'t-ok',warn:'t-warn',danger:'t-danger'}[cls];
-    const bCls=`ot-${cls}`;
-    return `<tr>
-      <td style="color:#8b949e;font-weight:700;font-size:12px">#${i+1}</td>
-      <td><strong>${e.name}</strong>${e.group?`<span class="gbadge">${e.group}</span>`:''}</td>
-      <td><span class="gbadge">${e.group||'—'}</span></td>
-      <td class="r">${e.days}日</td>
-      <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
-      <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">
-        <div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ${bCls}" style="width:${pct}%"></div></div>${m2hm(e.otM)}</div>
-      </td>
-      <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
-    </tr>`;
-  }).join('');
 
   // チャート: 月次残業推移
   const tLabels=recent.map(p=>p.label);
@@ -671,24 +677,59 @@ async function renderDashboard() {
     }
   });
 
-  // チャート: グループ別平均残業
-  const grps=[...new Set(employees.map(e=>e.group||'その他'))].sort();
+  // チャート: グループ別残業合計（① 固定順）
+  const GROUP_ORDER=['第一','第二','第三','品証','出荷','生管','営業','総務'];
+  const allGrps=[...new Set(employees.map(e=>e.group||'その他'))];
+  const grps=[...GROUP_ORDER.filter(g=>allGrps.includes(g)),
+              ...allGrps.filter(g=>!GROUP_ORDER.includes(g)).sort()];
   const gData=grps.map(g=>{
     const mem=stats.filter(e=>(e.group||'その他')===g);
     if (!mem.length) return 0;
-    return parseFloat((mem.reduce((s,e)=>s+e.otM,0)/mem.length/60).toFixed(1));
+    // ② 平均→合計に変更
+    return parseFloat((mem.reduce((s,e)=>s+e.otM,0)/60).toFixed(1));
   });
   if (chGroup) chGroup.destroy();
   chGroup=new Chart(document.getElementById('ch-group'),{
     type:'bar',
     data:{ labels:grps, datasets:[{
-      label:'平均残業(h)', data:gData,
+      label:'残業合計(h)', data:gData,
       backgroundColor:grps.map((_,i)=>`hsl(${200+i*28},60%,55%)`), borderRadius:4
     }]},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:false } },
       scales:{ x:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'} }, y:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'}, beginAtZero:true } }
     }
+  });
+
+  // ⑤ 出勤状況ミニグリッド
+  renderMiniGrid(todayMap);
+}
+
+function renderMiniGrid(todayMap) {
+  const grid = document.getElementById('d-emp-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  employees.forEach(emp => {
+    const recs = todayMap[emp.id] || [];
+    const last = recs.length ? recs[recs.length-1] : null;
+    let st = 'none';
+    if (last) {
+      if (last.type==='出勤'||last.type==='戻り') st='in';
+      else if (last.type==='外出') st='out';
+      else if (last.type==='退勤') st='done';
+    }
+    const label={none:'未出勤',in:'出勤中',out:'外出中',done:'退勤済'}[st];
+    const time = last ? last.time : '';
+    const card = document.createElement('div');
+    card.className = `mini-card mc-${st}`;
+    card.innerHTML = `
+      <div class="mini-card-accent"></div>
+      <div class="mini-card-body">
+        <div class="mini-card-name">${emp.name}</div>
+        <span class="mini-card-badge">${label}</span>
+        <div class="mini-card-time">${time||'—'}</div>
+      </div>`;
+    grid.appendChild(card);
   });
 }
 
