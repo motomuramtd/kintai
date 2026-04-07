@@ -183,8 +183,12 @@
       <div><label>休憩開始</label><input type="time" id="cfg-break-start" value="12:00"></div>
       <div><label>休憩終了</label><input type="time" id="cfg-break-end" value="12:45"></div>
     </div>
+    <div class="setup-inline" style="margin-top:8px">
+      <div><label>早出 最早開始</label><input type="time" id="cfg-early-ot-cutoff" value="07:15"><div class="setup-hint">これより早い打刻は早出に含めない</div></div>
+    </div>
     <label>残業時間上限（時間 / 月）</label>
     <input type="number" id="cfg-ot-limit" value="45" min="1" max="300" style="width:140px">
+    <div class="setup-hint" style="margin-top:6px">早出：始業15分前まで 15分刻み切り上げ　残業：終業15分後から 15分刻み切り捨て</div>
 
     <button class="setup-save-btn" onclick="saveConfigAndStart()">保存して起動</button>
     <div class="setup-hint">
@@ -376,7 +380,7 @@ const MAIN_KEY    = 'kintai_main_config';
 
 function loadSpCfg()   { try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); }  catch(e){ return null; } }
 function loadMainCfg() {
-  const def = { workStart:'08:30', workEnd:'17:00', breakStart:'12:00', breakEnd:'12:45', otLimit:45 };
+  const def = { workStart:'08:30', workEnd:'17:00', breakStart:'12:00', breakEnd:'12:45', otLimit:45, earlyOtCutoff:'07:15' };
   try { return Object.assign({}, def, JSON.parse(localStorage.getItem(MAIN_KEY))); } catch(e){ return def; }
 }
 function saveAllCfg(sp, mc) {
@@ -547,7 +551,22 @@ function calcDay(logs) {
   if (!ci) return null;
   const inM=t2m(ci.time), outM=co?t2m(co.time):null;
 
-  // 外出合計
+  const workSt = t2m(MC.workStart ||'08:30');  // 定時始業 510
+  const workEn = t2m(MC.workEnd   ||'17:00');  // 定時終業 1020
+  const bs     = t2m(MC.breakStart||'12:00');  // 休憩開始 720
+  const be     = t2m(MC.breakEnd  ||'12:45');  // 休憩終了 765
+
+  // ── 早出残業 ──
+  // 打刻 < 7:15:00  → 打刻〜8:15 を15分刻み切り捨て（例: 7:10打刻 → 65分 → 60分）
+  // 打刻 7:15〜8:29 → 0分（早出としない）
+  const earlyOtCutoff = t2m(MC.earlyOtCutoff||'07:15'); // この時刻以降は早出なし
+  const earlyOtEnd    = workSt - 15;                     // 8:15（早出カウント終点）
+  let earlyM = 0;
+  if (inM < earlyOtCutoff) {
+    earlyM = Math.floor((earlyOtEnd - inM) / 15) * 15;
+  }
+
+  // ── 外出合計 ──
   let absM=0, goM=null;
   logs.forEach(l=>{
     const t=t2m(l.time);
@@ -557,13 +576,22 @@ function calcDay(logs) {
 
   if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null };
 
+  // ── 残業: (終業+15分)起点 15分刻み切り捨て ──
+  // 例) 17:00終業 → 17:29:59まで残業なし、17:30〜=15分残業、17:45〜=30分…
+  const otThresh = workEn + 15;   // 17:15
+  let lateM = 0;
+  if (outM > otThresh) {
+    lateM = Math.floor((outM - otThresh) / 15) * 15;
+  }
+
+  const otM = earlyM + lateM;
+
+  // ── 実労働時間（出勤〜退勤 - 外出 - 休憩） ──
   const stay = outM - inM - absM;
-  const bs=t2m(MC.breakStart||'12:00'), be=t2m(MC.breakEnd||'12:45');
   let brk=0;
   if (outM>bs && inM<be) brk=Math.max(0, Math.min(outM,be)-Math.max(inM,bs));
   const workM = stay - brk;
-  const prescM = t2m(MC.workEnd||'17:00') - t2m(MC.workStart||'08:30') - (be-bs);
-  const otM = Math.max(0, workM - prescM);
+
   return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM };
 }
 
@@ -1022,7 +1050,8 @@ function openSettings() {
   document.getElementById('cfg-work-end').value   =mc.workEnd   ||'17:00';
   document.getElementById('cfg-break-start').value=mc.breakStart||'12:00';
   document.getElementById('cfg-break-end').value  =mc.breakEnd  ||'12:45';
-  document.getElementById('cfg-ot-limit').value   =mc.otLimit   ||45;
+  document.getElementById('cfg-ot-limit').value        =mc.otLimit       ||45;
+  document.getElementById('cfg-early-ot-cutoff').value =mc.earlyOtCutoff ||'07:15';
   showScreen('setup');
 }
 async function saveConfigAndStart() {
@@ -1040,7 +1069,8 @@ async function saveConfigAndStart() {
     workEnd:    document.getElementById('cfg-work-end').value  ||'17:00',
     breakStart: document.getElementById('cfg-break-start').value||'12:00',
     breakEnd:   document.getElementById('cfg-break-end').value  ||'12:45',
-    otLimit:    parseInt(document.getElementById('cfg-ot-limit').value)||45,
+    otLimit:       parseInt(document.getElementById('cfg-ot-limit').value)||45,
+    earlyOtCutoff: document.getElementById('cfg-early-ot-cutoff').value||'07:15',
   };
   saveAllCfg(sp,mc);
   await startApp(sp,mc);
