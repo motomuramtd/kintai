@@ -241,7 +241,10 @@
     <div id="content">
       <div class="content-header">
         <div>
-          <h2 id="page-title">ダッシュボード</h2>
+          <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+            <h2 id="page-title">ダッシュボード</h2>
+            <span id="d-period-label" style="font-size:12px;color:#8b949e;font-weight:400"></span>
+          </div>
           <div class="sub" id="page-sub">今日の状況と今月のサマリー</div>
         </div>
         <div id="header-clock">00:00:00</div>
@@ -271,7 +274,6 @@
           <div class="tbl-card" style="padding:14px 16px">
             <div class="tbl-hdr" style="margin-bottom:10px">
               <h3>👥 本日の出勤状況</h3>
-              <span id="d-period-label" style="font-size:11px;color:#8b949e"></span>
               <div style="display:flex;gap:12px;margin-left:auto;font-size:11px;color:#8b949e;align-items:center">
                 <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#27ae60;margin-right:4px;vertical-align:middle"></span>出勤中</span>
                 <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f39c12;margin-right:4px;vertical-align:middle"></span>外出中</span>
@@ -464,36 +466,35 @@ async function loadEmployees() {
 // シートキャッシュ: { 'YYYY-MM': { 'YYYY-MM-DD': { empId:[{type,time}] } } }
 // kintai.html は '勤怠データ' シート1枚に全データを書くため、初回に全件読み込む
 const SC = {};
-let _scLoaded = false;
-let _scLoading = null;
+let _scPromise = null; // 同一Promiseを全caller間で共有し並行読み込みを防ぐ
 
 async function ensureSheets(_names) {
-  // 既にロード済みなら即返す
-  if (_scLoaded) return;
-  // 並行呼び出し対策: 同じPromiseを返す
-  if (_scLoading) return _scLoading;
-  _scLoading = (async () => {
-    try {
-      const rng = await gGet(`/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('勤怠データ')/usedRange`);
-      (rng.values||[]).slice(1).forEach(row => {
-        if (!row[0]) return;
-        const d   = String(row[0]).slice(0,10);  // A列: YYYY-MM-DD
-        const eid = String(row[1]).trim();        // B列: 社員ID
-        const typ = String(row[2]).trim();        // C列: 種別（出勤/外出/戻り/退勤）
-        const tim = String(row[3]).trim();        // D列: 時刻
-        const ym  = d.slice(0,7);
-        if (!SC[ym])        SC[ym]        = {};
-        if (!SC[ym][d])     SC[ym][d]     = {};
-        if (!SC[ym][d][eid])SC[ym][d][eid]= [];
-        SC[ym][d][eid].push({ type: typ, time: tim });
-      });
-      _scLoaded = true;
-    } catch(e) {
-      console.error('ensureSheets error:', e);
-      _scLoading = null; // エラー時はリトライ可能にする
-    }
-  })();
-  return _scLoading;
+  if (!_scPromise) _scPromise = _loadKintaiData();
+  return _scPromise;
+}
+
+async function _loadKintaiData() {
+  try {
+    const rng = await gGet(
+      `/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('勤怠データ')/usedRange`
+    );
+    (rng.values||[]).slice(1).forEach(row => {
+      if (!row[0]) return;
+      const d   = String(row[0]).slice(0,10);  // A列: YYYY-MM-DD
+      const eid = String(row[1]).trim();        // B列: 社員ID
+      const typ = String(row[2]).trim();        // C列: 種別（出勤/外出/戻り/退勤）
+      const tim = String(row[3]).trim();        // D列: 時刻
+      if (!d || !eid || !typ) return;
+      const ym = d.slice(0,7);
+      if (!SC[ym])         SC[ym]         = {};
+      if (!SC[ym][d])      SC[ym][d]      = {};
+      if (!SC[ym][d][eid]) SC[ym][d][eid] = [];
+      SC[ym][d][eid].push({ type: typ, time: tim });
+    });
+  } catch(e) {
+    console.error('勤怠データ読み込みエラー:', e);
+    _scPromise = null; // エラー時は次回リトライ可能にする
+  }
 }
 function dayRecs(ds, empId) { return ((SC[ds.slice(0,7)]||{})[ds]||{})[empId]||[]; }
 
