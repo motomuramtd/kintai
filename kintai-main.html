@@ -464,37 +464,41 @@ async function loadEmployees() {
 }
 
 // シートキャッシュ: { 'YYYY-MM': { 'YYYY-MM-DD': { empId:[{type,time}] } } }
-// kintai.html は '勤怠データ' シート1枚に全データを書くため、初回に全件読み込む
+// kintai.html は勤怠データ.xlsx に月別シート('2026-04'等)を作成して書き込む
+// 列構成: A=日付, B=社員ID, C=氏名, D=種別, E=時刻
 const SC = {};
-let _scPromise = null; // 同一Promiseを全caller間で共有し並行読み込みを防ぐ
+const _sheetCache = {}; // 'YYYY-MM' → Promise（読み込み済み or 読み込み中）
 
-async function ensureSheets(_names) {
-  if (!_scPromise) _scPromise = _loadKintaiData();
-  return _scPromise;
+async function ensureSheets(names) {
+  names.forEach(n => {
+    if (!_sheetCache[n]) {
+      _sheetCache[n] = _loadSheet(n).catch(e => {
+        // 存在しない月のシートは空として扱う（エラーは警告のみ）
+        console.warn(`シート '${n}' 読み込みスキップ:`, e.message||e);
+      });
+    }
+  });
+  await Promise.all(names.map(n => _sheetCache[n]));
 }
 
-async function _loadKintaiData() {
-  try {
-    const rng = await gGet(
-      `/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('勤怠データ')/usedRange`
-    );
-    (rng.values||[]).slice(1).forEach(row => {
-      if (!row[0]) return;
-      const d   = String(row[0]).slice(0,10);  // A列: YYYY-MM-DD
-      const eid = String(row[1]).trim();        // B列: 社員ID
-      const typ = String(row[2]).trim();        // C列: 種別（出勤/外出/戻り/退勤）
-      const tim = String(row[3]).trim();        // D列: 時刻
-      if (!d || !eid || !typ) return;
-      const ym = d.slice(0,7);
-      if (!SC[ym])         SC[ym]         = {};
-      if (!SC[ym][d])      SC[ym][d]      = {};
-      if (!SC[ym][d][eid]) SC[ym][d][eid] = [];
-      SC[ym][d][eid].push({ type: typ, time: tim });
-    });
-  } catch(e) {
-    console.error('勤怠データ読み込みエラー:', e);
-    _scPromise = null; // エラー時は次回リトライ可能にする
-  }
+async function _loadSheet(ym) {
+  const rng = await gGet(
+    `/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('${ym}')/usedRange`
+  );
+  (rng.values||[]).slice(1).forEach(row => {
+    if (!row[0]) return;
+    const d   = String(row[0]).slice(0,10);  // A列: 日付 YYYY-MM-DD
+    const eid = String(row[1]).trim();        // B列: 社員ID
+    // C列(row[2])は氏名 → スキップ
+    const typ = String(row[3]).trim();        // D列: 種別（出勤/外出/戻り/退勤）
+    const tim = String(row[4]).trim();        // E列: 時刻
+    if (!d || !eid || !typ) return;
+    const dym = d.slice(0,7);
+    if (!SC[dym])         SC[dym]         = {};
+    if (!SC[dym][d])      SC[dym][d]      = {};
+    if (!SC[dym][d][eid]) SC[dym][d][eid] = [];
+    SC[dym][d][eid].push({ type: typ, time: tim });
+  });
 }
 function dayRecs(ds, empId) { return ((SC[ds.slice(0,7)]||{})[ds]||{})[empId]||[]; }
 
