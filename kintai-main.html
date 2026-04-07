@@ -260,8 +260,8 @@
           <!-- サマリーカード（3枚） -->
           <div class="card-row cols-3" id="dash-cards">
             <div class="card"><h3>本日の出勤</h3><div class="card-val c-blue" id="d-today">—</div><div class="card-sub" id="d-today-sub">—</div></div>
-            <div class="card"><h3>今月の出勤率</h3><div class="card-val c-green" id="d-rate">—</div><div class="card-sub" id="d-rate-sub">—</div></div>
             <div class="card"><h3>今月の残業合計</h3><div class="card-val c-yellow" id="d-ot-total">—</div><div class="card-sub" id="d-ot-sub">—</div></div>
+            <div class="card"><h3>出勤人数（直近5日間）</h3><div class="card-val c-green" id="d-headcount">—</div><div class="card-sub" id="d-headcount-sub">人</div></div>
           </div>
           <!-- チャート -->
           <div class="card-row cols-2">
@@ -584,6 +584,18 @@ function calcDay(logs) {
     lateM = Math.floor((outM - otThresh) / 15) * 15;
   }
 
+  // ── 遅刻: 始業(8:30)より遅い打刻、15分刻み切り捨て ──
+  let lateArrM = 0;
+  if (inM > workSt) {
+    lateArrM = Math.floor((inM - workSt) / 15) * 15;
+  }
+
+  // ── 早退: 終業(17:00)より早い退勤、15分刻み切り捨て ──
+  let earlyLeaveM = 0;
+  if (outM < workEn) {
+    earlyLeaveM = Math.floor((workEn - outM) / 15) * 15;
+  }
+
   const otM = earlyM + lateM;
 
   // ── 実労働時間（出勤〜退勤 - 外出 - 休憩） ──
@@ -592,11 +604,11 @@ function calcDay(logs) {
   if (outM>bs && inM<be) brk=Math.max(0, Math.min(outM,be)-Math.max(inM,bs));
   const workM = stay - brk;
 
-  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM };
+  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM, lateArrM, earlyLeaveM };
 }
 
 function aggPeriod(empId, start, end) {
-  let days=0, workM=0, otM=0, earlyM=0, lateM=0;
+  let days=0, workM=0, otM=0, earlyM=0, lateM=0, lateArrM=0, earlyLeaveM=0;
   let d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
   while (d<=ed) {
     const ds=d.toLocaleDateString('sv');
@@ -604,10 +616,11 @@ function aggPeriod(empId, start, end) {
     if (st&&st.workM!==null){
       days++; workM+=st.workM; otM+=st.otM||0;
       earlyM+=st.earlyM||0; lateM+=st.lateM||0;
+      lateArrM+=st.lateArrM||0; earlyLeaveM+=st.earlyLeaveM||0;
     } else if (logs.some(r=>r.type==='出勤')) days++;
     d.setDate(d.getDate()+1);
   }
-  return { days, workM, otM, earlyM, lateM };
+  return { days, workM, otM, earlyM, lateM, lateArrM, earlyLeaveM };
 }
 
 // ================================================================
@@ -729,13 +742,29 @@ async function renderDashboard() {
   const stats=employees.map(emp=>({ ...emp, ...aggPeriod(emp.id,cp.start,cp.end) }));
   const totalOt=stats.reduce((s,e)=>s+e.otM,0);
 
-  const maxDays=workdays(cp.start, today<=cp.end?today:cp.end);
-  const avgDays=stats.reduce((s,e)=>s+e.days,0)/employees.length;
-  const rate=maxDays>0?Math.round(avgDays/maxDays*100):0;
-  document.getElementById('d-rate').textContent=`${rate}%`;
-  document.getElementById('d-rate-sub').textContent=`平均 ${avgDays.toFixed(1)}日 / ${maxDays}日`;
   document.getElementById('d-ot-total').textContent=m2hm(totalOt);
   document.getElementById('d-ot-sub').textContent=`平均 ${m2hm(Math.round(totalOt/employees.length))} / 人`;
+
+  // ── 出勤人数（当日〜5日前）: 全員の出勤時間合計 ÷ 7.75h ──
+  const days5 = [];
+  for (let i=0; i<=5; i++) {
+    const d5=new Date(); d5.setDate(d5.getDate()-i);
+    days5.push(d5.toLocaleDateString('sv'));
+  }
+  const d5oldest = days5[days5.length-1];
+  const d5newest = days5[0];
+  // 必要なシートを追加ロード（既にロード済みの場合はスキップ）
+  const d5months = [...new Set(days5.map(d=>d.slice(0,7)))];
+  await ensureSheets(d5months);
+  const totalWork5M = employees.reduce((sum, emp) => {
+    return sum + days5.reduce((s, ds) => {
+      const st = calcDay(dayRecs(ds, emp.id));
+      return s + (st && st.workM !== null ? st.workM : 0);
+    }, 0);
+  }, 0);
+  const headcount = (totalWork5M / (7.75 * 60)).toFixed(2);
+  document.getElementById('d-headcount').textContent=`${headcount}`;
+  document.getElementById('d-headcount-sub').textContent=`人（${d5oldest.slice(5).replace('-','/')}〜${d5newest.slice(5).replace('-','/')}）`;
 
   // チャート: 月次残業推移
   const tLabels=recent.map(p=>p.label);
