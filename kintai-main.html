@@ -340,7 +340,7 @@
             <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
             <div style="overflow-x:auto">
               <table class="tbl">
-                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r">残業時間</th><th>進捗</th><th>状況</th></tr></thead>
+                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
                 <tbody id="ot-detail-tbody"></tbody>
               </table>
             </div>
@@ -592,20 +592,22 @@ function calcDay(logs) {
   if (outM>bs && inM<be) brk=Math.max(0, Math.min(outM,be)-Math.max(inM,bs));
   const workM = stay - brk;
 
-  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM };
+  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM };
 }
 
 function aggPeriod(empId, start, end) {
-  let days=0, workM=0, otM=0;
+  let days=0, workM=0, otM=0, earlyM=0, lateM=0;
   let d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
   while (d<=ed) {
     const ds=d.toLocaleDateString('sv');
     const logs=dayRecs(ds,empId), st=calcDay(logs);
-    if (st&&st.workM!==null){ days++; workM+=st.workM; otM+=st.otM||0; }
-    else if (logs.some(r=>r.type==='出勤')) days++;
+    if (st&&st.workM!==null){
+      days++; workM+=st.workM; otM+=st.otM||0;
+      earlyM+=st.earlyM||0; lateM+=st.lateM||0;
+    } else if (logs.some(r=>r.type==='出勤')) days++;
     d.setDate(d.getDate()+1);
   }
-  return { days, workM, otM };
+  return { days, workM, otM, earlyM, lateM };
 }
 
 // ================================================================
@@ -928,6 +930,8 @@ async function renderOvertimePage() {
       <td><span class="gbadge">${e.group||'—'}</span></td>
       <td class="r">${e.days}日</td>
       <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
+      <td class="r" style="color:#58a6ff">${e.earlyM>0?m2hm(e.earlyM):'—'}</td>
+      <td class="r" style="color:#d29922">${e.lateM>0?m2hm(e.lateM):'—'}</td>
       <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">
         <div class="ot-wrap" style="justify-content:flex-end">
           <div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div>
@@ -1014,7 +1018,7 @@ async function renderIndividualPage() {
       <span style="font-size:11px;color:#8b949e">最多残業月: ${maxOtP.otM>0?maxOtP.label+'（'+m2hm(maxOtP.otM)+'）':'データなし'}</span>
     </div>
     <table class="tbl">
-      <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r">残業時間</th><th>上限比</th><th>状況</th></tr></thead>
+      <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
       <tbody>`;
   pst.forEach(p=>{
     const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
@@ -1025,6 +1029,8 @@ async function renderIndividualPage() {
       <td style="color:#8b949e;font-size:11px">${p.tip}</td>
       <td class="r">${p.days>0?p.days+'日':'—'}</td>
       <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
+      <td class="r" style="color:#58a6ff">${p.earlyM>0?m2hm(p.earlyM):'—'}</td>
+      <td class="r" style="color:#d29922">${p.lateM>0?m2hm(p.lateM):'—'}</td>
       <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">${p.otM>0?m2hm(p.otM):'—'}</td>
       <td><div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div><span style="font-size:11px;color:#8b949e">${pct}%</span></div></td>
       <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
