@@ -555,7 +555,7 @@ async function loadTodayRecords() {
       if (d !== today) return;
       const eid = String(row[1]);
       if (!recs[eid]) recs[eid] = [];
-      recs[eid].push({ type: String(row[3]), time: String(row[4]) });
+      recs[eid].push({ type: String(row[3]), time: excelTimeStr(row[4]) });
     });
     return recs;
   } catch(e) {
@@ -576,7 +576,7 @@ async function loadRecordsByDate(dateStr) {
       if (d !== dateStr) return;
       const eid = String(row[1]);
       if (!recs[eid]) recs[eid] = [];
-      recs[eid].push({ type: String(row[3]), time: String(row[4]) });
+      recs[eid].push({ type: String(row[3]), time: excelTimeStr(row[4]) });
     });
     return recs;
   } catch(e) {
@@ -804,6 +804,18 @@ function excelDateStr(val) {
     return new Date(ms).toLocaleDateString('sv');
   }
   return String(val).slice(0, 10);
+}
+
+// Excel時刻シリアル値(数値 0〜1)→ HH:MM:SS 文字列に変換
+function excelTimeStr(val) {
+  if (typeof val === 'number') {
+    const totalSec = Math.round(val * 86400);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  return String(val);
 }
 
 function getStatus(empId) {
@@ -1346,11 +1358,11 @@ async function ensureSheetsLoaded(sheetNames) {
       const byDate = {};
       (range.values || []).slice(1).forEach(row => {
         if (!row[0]) return;
-        const d   = String(row[0]).slice(0, 10);
+        const d   = excelDateStr(row[0]);
         const eid = String(row[1]);
         if (!byDate[d])      byDate[d]      = {};
         if (!byDate[d][eid]) byDate[d][eid] = [];
-        byDate[d][eid].push({ type: String(row[3]), time: String(row[4]) });
+        byDate[d][eid].push({ type: String(row[3]), time: excelTimeStr(row[4]) });
       });
       dashDataCache[sn] = byDate;
     } catch(e) {

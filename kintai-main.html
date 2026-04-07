@@ -491,6 +491,18 @@ function excelSerialToDateStr(val) {
   return String(val).slice(0, 10);
 }
 
+// Excel時刻シリアル値(数値 0〜1)→ HH:MM:SS 文字列に変換
+function excelSerialToTimeStr(val) {
+  if (typeof val === 'number') {
+    const totalSec = Math.round(val * 86400);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  return String(val);
+}
+
 async function _loadSheet(ym) {
   const rng = await gGet(
     `/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('${ym}')/usedRange`
@@ -503,7 +515,7 @@ async function _loadSheet(ym) {
     const eid = String(row[1]).trim();          // B列: 社員ID
     // C列(row[2])は氏名 → スキップ
     const typ = String(row[3]).trim();          // D列: 種別（出勤/外出/戻り/退勤）
-    const tim = String(row[4]).trim();          // E列: 時刻
+    const tim = excelSerialToTimeStr(row[4]);   // E列: 時刻（シリアル値 or 文字列）
     if (!d || !eid || !typ) return;
     const dym = d.slice(0,7);
     if (!SC[dym])         SC[dym]         = {};
