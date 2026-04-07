@@ -485,7 +485,9 @@ async function _loadSheet(ym) {
   const rng = await gGet(
     `/drives/${dDriveId}/items/${dItemId}/workbook/worksheets('${ym}')/usedRange`
   );
-  (rng.values||[]).slice(1).forEach(row => {
+  const rows = (rng.values||[]).slice(1);
+  let count = 0;
+  rows.forEach(row => {
     if (!row[0]) return;
     const d   = String(row[0]).slice(0,10);  // A列: 日付 YYYY-MM-DD
     const eid = String(row[1]).trim();        // B列: 社員ID
@@ -498,7 +500,12 @@ async function _loadSheet(ym) {
     if (!SC[dym][d])      SC[dym][d]      = {};
     if (!SC[dym][d][eid]) SC[dym][d][eid] = [];
     SC[dym][d][eid].push({ type: typ, time: tim });
+    count++;
   });
+  console.log(`[勤怠] シート '${ym}' 読込完了: ${rows.length}行(ヘッダ除く), 有効レコード=${count}件`);
+  if (rows.length > 0) {
+    console.log(`[勤怠] 先頭行サンプル: A="${rows[0][0]}" B="${rows[0][1]}" C="${rows[0][2]}" D="${rows[0][3]}" E="${rows[0][4]}"`);
+  }
 }
 function dayRecs(ds, empId) { return ((SC[ds.slice(0,7)]||{})[ds]||{})[empId]||[]; }
 
@@ -641,6 +648,25 @@ async function renderDashboard() {
   // 直近6ヶ月 + 今月のシートを並列読み込み
   const recent=periods.slice(-6);
   await ensureSheets(sheetsFor([cp,...recent]));
+
+  // ── 診断ログ ──
+  const totalRecs = Object.values(SC).reduce((s,m)=>s+Object.values(m).reduce((s2,d)=>s2+Object.values(d).reduce((s3,a)=>s3+a.length,0),0),0);
+  console.log(`[勤怠DB] SC総レコード数: ${totalRecs}, ロード済み月: ${Object.keys(SC).join(', ')||'なし'}`);
+  const diagEl = document.getElementById('d-diag');
+  if (diagEl) diagEl.remove();
+  if (totalRecs === 0) {
+    const warn = document.createElement('div');
+    warn.id = 'd-diag';
+    warn.style.cssText = 'background:#2a1a00;border:1px solid #d29922;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#e6c97a;';
+    warn.innerHTML = `⚠️ 勤怠データが0件です。<br>
+      <small style="color:#8b949e">
+      ① kintai.html で打刻が行われているか確認<br>
+      ② 設定の「勤怠データ.xlsx のパス」が正しいか確認（コンソールの[勤怠]ログを参照）<br>
+      ③ 勤怠データ.xlsx 内のシート名が「2026-04」形式か確認
+      </small>`;
+    document.getElementById('dash-cards').before(warn);
+  }
+  // ── 診断ログ終 ──
 
   const today=new Date().toLocaleDateString('sv');
   const todayMap=SC[today.slice(0,7)]?.[today]||{};
