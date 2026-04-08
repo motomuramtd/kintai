@@ -996,7 +996,8 @@ async function renderOvertimePage() {
       plugins:{ legend:{ display:false } },
       scales:{
         x:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'}, beginAtZero:true },
-        y:{ grid:{color:'#21262d'}, ticks:{color:'#cdd9e5',font:{size:11}} }
+        y:{ grid:{color:'#21262d'}, ticks:{color:'#cdd9e5',font:{size:11}},
+            afterFit(scale){ scale.width=100; } }
       }
     }
   });
