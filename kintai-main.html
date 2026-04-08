@@ -982,10 +982,12 @@ async function renderOvertimePage() {
   // ランキングチャート（上位15名）
   const top=sorted.slice(0,15);
   const limitH=MC.otLimit||45;
-  // 人数に応じて高さを動的調整（1人あたり28px、最低180px）
-  const rankH = Math.max(180, top.length * 28);
-  document.querySelector('.chart-wrap canvas#ch-ot-rank').parentElement.style.height = rankH + 'px';
-  document.querySelector('.chart-wrap canvas#ch-ot-rank').closest('.chart-card').style.height = (rankH + 60) + 'px';
+  // 人数に応じて高さを動的調整（1人あたり40px、最低200px）
+  const rankH = Math.max(200, top.length * 40);
+  const rankWrap = document.getElementById('ch-ot-rank').parentElement;
+  const rankCard = rankWrap.closest('.chart-card');
+  rankWrap.style.height = rankH + 'px';
+  rankCard.style.height = (rankH + 60) + 'px';
   if (chRank) chRank.destroy();
   chRank=new Chart(document.getElementById('ch-ot-rank'),{
     type:'bar',
