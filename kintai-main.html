@@ -584,16 +584,18 @@ function calcDay(logs) {
     lateM = Math.floor((outM - otThresh) / 15) * 15;
   }
 
-  // ── 遅刻: 始業(8:30)より遅い打刻、15分刻み切り捨て ──
+  // ── 遅刻: 始業(8:30)より遅い打刻、15分刻み切り上げ ──
+  // 例) 8:31〜8:44 → 15分、8:45〜8:59 → 15分(同)、8:46→30分…
   let lateArrM = 0;
   if (inM > workSt) {
-    lateArrM = Math.floor((inM - workSt) / 15) * 15;
+    lateArrM = Math.ceil((inM - workSt) / 15) * 15;
   }
 
-  // ── 早退: 終業(17:00)より早い退勤、15分刻み切り捨て ──
+  // ── 早退: 終業(17:00)より早い退勤、15分刻み切り上げ ──
+  // 例) 16:46〜16:59 → 15分、16:45〜16:31 → 15分(同)、16:30→30分…
   let earlyLeaveM = 0;
   if (outM < workEn) {
-    earlyLeaveM = Math.floor((workEn - outM) / 15) * 15;
+    earlyLeaveM = Math.ceil((workEn - outM) / 15) * 15;
   }
 
   const otM = earlyM + lateM;
