@@ -982,6 +982,10 @@ async function renderOvertimePage() {
   // ランキングチャート（上位15名）
   const top=sorted.slice(0,15);
   const limitH=MC.otLimit||45;
+  // 人数に応じて高さを動的調整（1人あたり28px、最低180px）
+  const rankH = Math.max(180, top.length * 28);
+  document.querySelector('.chart-wrap canvas#ch-ot-rank').parentElement.style.height = rankH + 'px';
+  document.querySelector('.chart-wrap canvas#ch-ot-rank').closest('.chart-card').style.height = (rankH + 60) + 'px';
   if (chRank) chRank.destroy();
   chRank=new Chart(document.getElementById('ch-ot-rank'),{
     type:'bar',
@@ -996,7 +1000,7 @@ async function renderOvertimePage() {
       plugins:{ legend:{ display:false } },
       scales:{
         x:{ grid:{color:'#21262d'}, ticks:{color:'#8b949e'}, beginAtZero:true },
-        y:{ grid:{color:'#21262d'}, ticks:{color:'#cdd9e5',font:{size:11}},
+        y:{ grid:{color:'#21262d'}, ticks:{color:'#cdd9e5',font:{size:11},autoSkip:false},
             afterFit(scale){ scale.width=100; } }
       }
     }
