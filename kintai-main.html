@@ -292,7 +292,7 @@
         <!-- ===== Monthly ===== -->
         <div class="page" id="page-monthly">
           <div class="period-bar">
-            <label>年度</label>
+            <label>期</label>
             <button class="pb-btn" onclick="changeMonthlyFY(-1)">◀</button>
             <span class="pb-label" id="m-fy-label"></span>
             <button class="pb-btn" onclick="changeMonthlyFY(1)">▶</button>
@@ -632,6 +632,10 @@ function getFY() {
   const m=new Date().getMonth()+1, y=new Date().getFullYear();
   return m>=10?y:y-1;
 }
+// 期ラベル: 2025/10〜2026/9 = 70期, 以降±1ずつ
+function fyLabel(fy) {
+  return `${70 + (fy - 2025)}期`;
+}
 function getPeriods(fy) {
   const ps=[];
   for (let p=0;p<12;p++) {
@@ -849,7 +853,7 @@ function renderMiniGrid(todayMap) {
 //  月次集計
 // ================================================================
 async function renderMonthlyPage() {
-  document.getElementById('m-fy-label').textContent=`${monthlyFY}年度（${monthlyFY}/10〜${monthlyFY+1}/9）`;
+  document.getElementById('m-fy-label').textContent=`${fyLabel(monthlyFY)}（${monthlyFY}/10〜${monthlyFY+1}/9）`;
   const wrap=document.getElementById('m-table-wrap');
   wrap.innerHTML='<div style="text-align:center;padding:40px;color:#8b949e">読み込み中...</div>';
   const periods=getPeriods(monthlyFY);
@@ -913,7 +917,7 @@ function exportMonthlyCsv() {
   const csv='\uFEFF'+[hdr.join(','),...rows].join('\n');
   const a=Object.assign(document.createElement('a'),{
     href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
-    download:`月次集計_${monthlyFY}年度_${vt==='days'?'出勤日数':vt==='work'?'実働時間':'残業時間'}.csv`
+    download:`月次集計_${fyLabel(monthlyFY)}_${vt==='days'?'出勤日数':vt==='work'?'実働時間':'残業時間'}.csv`
   });
   a.click(); toast('📥 CSV出力しました');
 }
@@ -924,7 +928,7 @@ function exportMonthlyCsv() {
 async function renderOvertimePage() {
   const periods=getPeriods(otFY);
   const p=periods[otPIdx]||periods[0];
-  document.getElementById('ot-period-label').textContent=`${otFY}年度 ${p.label}（${p.tip}）`;
+  document.getElementById('ot-period-label').textContent=`${fyLabel(otFY)} ${p.label}（${p.tip}）`;
   document.getElementById('ot-range').textContent=p.tip;
   const otLimit=(MC.otLimit||45)*60;
   document.getElementById('ot-limit-label').textContent=`上限: ${MC.otLimit||45}h`;
@@ -1017,14 +1021,14 @@ function initIndPage() {
       sel.appendChild(opt);
     });
   }
-  document.getElementById('ind-fy-label').textContent=`${indFY}年度`;
+  document.getElementById('ind-fy-label').textContent=`${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9）`;
   if (sel.value) renderIndividualPage();
 }
 async function renderIndividualPage() {
   const empId=document.getElementById('ind-sel').value;
   if (!empId){ document.getElementById('ind-content').innerHTML='<div style="text-align:center;padding:80px;color:#8b949e">↑ 社員を選択してください</div>'; return; }
   const emp=employees.find(e=>e.id===empId);
-  document.getElementById('ind-fy-label').textContent=`${indFY}年度`;
+  document.getElementById('ind-fy-label').textContent=`${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9）`;
   document.getElementById('ind-content').innerHTML='<div style="text-align:center;padding:40px;color:#8b949e">読み込み中...</div>';
 
   const periods=getPeriods(indFY);
@@ -1046,7 +1050,7 @@ async function renderIndividualPage() {
   </div>
   <div class="tbl-card">
     <div class="tbl-hdr">
-      <h3>📆 ${indFY}年度 月別サマリー</h3>
+      <h3>📆 ${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9） 月別サマリー</h3>
       <span style="font-size:11px;color:#8b949e">最多残業月: ${maxOtP.otM>0?maxOtP.label+'（'+m2hm(maxOtP.otM)+'）':'データなし'}</span>
     </div>
     <table class="tbl">
