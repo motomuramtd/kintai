@@ -261,7 +261,7 @@
           <div class="card-row cols-3" id="dash-cards">
             <div class="card"><h3>本日の出勤</h3><div class="card-val c-blue" id="d-today">—</div><div class="card-sub" id="d-today-sub">—</div></div>
             <div class="card"><h3>今月の残業合計</h3><div class="card-val c-yellow" id="d-ot-total">—</div><div class="card-sub" id="d-ot-sub">—</div></div>
-            <div class="card"><h3>出勤人数（直近5日間）</h3><div class="card-val c-green" id="d-headcount">—</div><div class="card-sub" id="d-headcount-sub">人</div></div>
+            <div class="card"><h3>出勤人数（直近3日間）</h3><div id="d-headcount-list" style="margin-top:4px"></div></div>
           </div>
           <!-- チャート -->
           <div class="card-row cols-2">
@@ -747,26 +747,27 @@ async function renderDashboard() {
   document.getElementById('d-ot-total').textContent=m2hm(totalOt);
   document.getElementById('d-ot-sub').textContent=`平均 ${m2hm(Math.round(totalOt/employees.length))} / 人`;
 
-  // ── 出勤人数（当日〜5日前）: 全員の出勤時間合計 ÷ 7.75h ──
-  const days5 = [];
-  for (let i=0; i<=5; i++) {
-    const d5=new Date(); d5.setDate(d5.getDate()-i);
-    days5.push(d5.toLocaleDateString('sv'));
+  // ── 出勤人数（直近3日間）: 日ごとに 全員の出勤時間合計 ÷ 7.75h ──
+  const days3 = [];
+  for (let i=0; i<=2; i++) {
+    const dx=new Date(); dx.setDate(dx.getDate()-i);
+    days3.push(dx.toLocaleDateString('sv'));
   }
-  const d5oldest = days5[days5.length-1];
-  const d5newest = days5[0];
-  // 必要なシートを追加ロード（既にロード済みの場合はスキップ）
-  const d5months = [...new Set(days5.map(d=>d.slice(0,7)))];
-  await ensureSheets(d5months);
-  const totalWork5M = employees.reduce((sum, emp) => {
-    return sum + days5.reduce((s, ds) => {
+  const d3months = [...new Set(days3.map(d=>d.slice(0,7)))];
+  await ensureSheets(d3months);
+  const hcRows = days3.map(ds => {
+    const totalM = employees.reduce((sum, emp) => {
       const st = calcDay(dayRecs(ds, emp.id));
-      return s + (st && st.workM !== null ? st.workM : 0);
+      return sum + (st && st.workM !== null ? st.workM : 0);
     }, 0);
-  }, 0);
-  const headcount = (totalWork5M / (7.75 * 60)).toFixed(2);
-  document.getElementById('d-headcount').textContent=`${headcount}`;
-  document.getElementById('d-headcount-sub').textContent=`人（${d5oldest.slice(5).replace('-','/')}〜${d5newest.slice(5).replace('-','/')}）`;
+    const hc = (totalM / (7.75 * 60)).toFixed(2);
+    const label = ds.slice(5).replace('-','/');
+    return `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;border-bottom:1px solid #21262d">
+      <span style="font-size:12px;color:#8b949e">${label}</span>
+      <span style="font-size:20px;font-weight:700;color:#3fb950;font-variant-numeric:tabular-nums">${hc}<span style="font-size:11px;color:#8b949e;margin-left:2px">人</span></span>
+    </div>`;
+  });
+  document.getElementById('d-headcount-list').innerHTML = hcRows.join('');
 
   // チャート: 月次残業推移
   const tLabels=recent.map(p=>p.label);
