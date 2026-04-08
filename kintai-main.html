@@ -717,6 +717,7 @@ let employees=[], dashInited=false;
 let monthlyFY=getFY(), otFY=getFY(), otPIdx=null, indFY=getFY();
 let chTrend=null, chGroup=null;
 let otGroupFilter='';
+const GROUP_ORDER=['第一','第二','第三','品証','出荷','生管','営業','総務'];
 
 // ================================================================
 //  ページ制御
@@ -939,8 +940,7 @@ async function renderDashboard() {
     }
   });
 
-  // チャート: グループ別残業合計（① 固定順）
-  const GROUP_ORDER=['第一','第二','第三','品証','出荷','生管','営業','総務'];
+  // チャート: グループ別残業合計（GROUP_ORDER 固定順）
   const allGrps=[...new Set(employees.map(e=>e.group||'その他'))];
   const grps=[...GROUP_ORDER.filter(g=>allGrps.includes(g)),
               ...allGrps.filter(g=>!GROUP_ORDER.includes(g)).sort()];
