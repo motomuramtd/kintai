@@ -1082,8 +1082,11 @@ async function renderOvertimePage() {
   await ensureSheets([p.start.slice(0,7),p.end.slice(0,7)]);
   const stats=employees.map(emp=>({ ...emp, ...aggPeriod(emp.id,p.start,p.end) }));
 
-  // Group filter buttons
-  const groups = ['', ...[...new Set(employees.map(e=>e.group).filter(Boolean))].sort()];
+  // Group filter buttons — ダッシュボードの GROUP_ORDER と同じ並び
+  const allEmpGrps = [...new Set(employees.map(e=>e.group).filter(Boolean))];
+  const orderedGrps = [...GROUP_ORDER.filter(g=>allEmpGrps.includes(g)),
+                       ...allEmpGrps.filter(g=>!GROUP_ORDER.includes(g)).sort()];
+  const groups = ['', ...orderedGrps];
   document.getElementById('ot-group-bar').innerHTML = groups.map(g =>
     `<button onclick="setOtGroup('${g}')" style="padding:5px 14px;border-radius:20px;border:1px solid ${otGroupFilter===g?'#58a6ff':'#30363d'};background:${otGroupFilter===g?'#1a3a5a':'#21262d'};color:${otGroupFilter===g?'#58a6ff':'#8b949e'};cursor:pointer;font-size:12px">${g||'全員'}</button>`
   ).join('');
