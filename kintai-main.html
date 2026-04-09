@@ -152,6 +152,29 @@
     #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
     @media(max-width:1100px){.cols-4{grid-template-columns:repeat(2,1fr)}}
+
+    /* ===== Matrix Calendar ===== */
+    .kal-wrap{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px}
+    .kal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;color:#8b949e;align-items:center}
+    .kal-legend-dot{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:3px}
+    .kal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px}
+    .kal-dow{text-align:center;font-size:11px;color:#8b949e;padding:4px 2px;font-weight:600}
+    .kal-cell{min-height:56px;padding:5px 4px;border-radius:6px;border:1px solid #30363d;cursor:pointer;position:relative;transition:border-color .12s,background .12s;background:#161b22}
+    .kal-cell:hover:not(.kal-empty):not(.kal-disabled){border-color:#58a6ff}
+    .kal-cell.kal-empty{border:none;cursor:default;background:transparent}
+    .kal-cell.kal-today{border-color:#58a6ff !important;box-shadow:0 0 0 1px #58a6ff22}
+    .kal-cell.kal-off{background:#1a1f27}
+    .kal-cell.kal-holiday-jp{background:#2a1520}
+    .kal-cell.kal-tokubetsu{background:#1a1a3a}
+    .kal-cell.kal-yuukyu{background:#1a3a2a}
+    .kal-cell.kal-hankyu-am{background:#163022}
+    .kal-cell.kal-hankyu-pm{background:#122820}
+    .kal-cell.kal-disabled{cursor:default;opacity:.6}
+    .kal-cell.kal-disabled:hover{border-color:#30363d !important}
+    .kal-num{font-size:13px;font-weight:600;color:#e6edf3}
+    .kal-num.sun{color:#f85149}.kal-num.sat{color:#58a6ff}
+    .kal-sub{font-size:9px;color:#8b949e;margin-top:2px;line-height:1.3;word-break:break-all}
+    .kal-badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:8px;margin-top:2px;font-weight:700}
   </style>
 </head>
 <body>
@@ -348,7 +371,7 @@
             <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
             <div style="overflow-x:auto">
               <table class="tbl">
-                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
+                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
                 <tbody id="ot-detail-tbody"></tbody>
               </table>
             </div>
@@ -375,31 +398,20 @@
         <!-- ===== Calendar ===== -->
         <div class="page" id="page-calendar">
           <div class="period-bar">
-            <label>会社カレンダー管理</label>
-            <button class="btn-export" onclick="openAddCalendar()" style="margin-left:auto">＋ 追加</button>
+            <label>会社カレンダー</label>
+            <button class="pb-btn" onclick="changeCalMonth(-1)">◀</button>
+            <span id="cal-month-label" class="pb-label"></span>
+            <button class="pb-btn" onclick="changeCalMonth(1)">▶</button>
           </div>
-          <div class="tbl-card">
-            <div class="tbl-hdr"><h3>📅 休日・特別日一覧</h3><span id="cal-count" style="font-size:11px;color:#8b949e"></span></div>
-            <div style="overflow-y:auto;max-height:calc(100vh - 260px)">
-              <table class="tbl"><thead><tr><th>日付</th><th>種別</th><th>メモ</th><th></th></tr></thead><tbody id="cal-tbody"></tbody></table>
+          <div class="kal-wrap">
+            <div class="kal-legend">
+              <span><span class="kal-legend-dot" style="background:#1a1f27"></span>休日</span>
+              <span><span class="kal-legend-dot" style="background:#2a1520"></span>祝日</span>
+              <span><span class="kal-legend-dot" style="background:#1a1a3a"></span>特別</span>
+              <span><span class="kal-legend-dot" style="background:#161b22;border:1px solid #58a6ff"></span>今日</span>
+              <span style="margin-left:auto;color:#6e7681">日付をクリックして状態切り替え</span>
             </div>
-          </div>
-          <div id="cal-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
-            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:360px">
-              <h3 style="margin-bottom:16px">📅 カレンダー登録</h3>
-              <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
-              <input type="date" id="cal-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
-              <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">種別</label>
-              <select id="cal-type" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
-                <option value="休日">休日</option><option value="祝日">祝日</option><option value="特別">特別</option>
-              </select>
-              <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ</label>
-              <input type="text" id="cal-memo" placeholder="例: 創立記念日" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px">
-              <div style="display:flex;gap:8px">
-                <button onclick="saveCalEntry()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
-                <button onclick="document.getElementById('cal-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
-              </div>
-            </div>
+            <div id="cal-grid"></div>
           </div>
         </div>
 
@@ -718,6 +730,48 @@ let monthlyFY=getFY(), otFY=getFY(), otPIdx=null, indFY=getFY();
 let chTrend=null, chGroup=null;
 let otGroupFilter='';
 const GROUP_ORDER=['第一','第二','第三','品証','出荷','生管','営業','総務'];
+
+// ================================================================
+//  日本の祝日
+// ================================================================
+let jpHolidays = {};
+async function loadJpHolidays() {
+  try {
+    const res = await fetch('https://holidays-jp.github.io/api/v1/date.json');
+    if (res.ok) jpHolidays = await res.json();
+    console.log('[祝日] 読込完了:', Object.keys(jpHolidays).length, '件');
+  } catch(e) { console.warn('[祝日] 取得失敗:', e.message); }
+}
+
+// カレンダー月ナビ状態
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth()+1;
+let lpCalYear=new Date().getFullYear(), lpCalMonth=new Date().getMonth()+1;
+
+// 日付の自然状態（過去登録なし時のデフォルト）
+function naturalDayState(ds) {
+  const dow=new Date(ds+'T00:00:00').getDay();
+  if (dow===0) return 'sunday';
+  if (dow===6) return 'saturday';
+  if (jpHolidays[ds]) return 'holiday';
+  return 'workday';
+}
+// 会社カレンダー上の日付の状態
+function calDayState(ds) {
+  const e=KC.calendar.find(e=>e.date===ds);
+  if(e) return e.type;
+  return naturalDayState(ds);
+}
+// その日は非出勤日か
+function isHolidayDate(ds) {
+  const s=calDayState(ds);
+  return s==='sunday'||s==='saturday'||s==='holiday'||s==='休日'||s==='祝日';
+}
+// YYYY-MM-DD 配列を生成（月の全日）
+function monthDates(y,m) {
+  const last=new Date(y,m,0).getDate(),arr=[];
+  for(let d=1;d<=last;d++) arr.push(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  return arr;
+}
 
 // ================================================================
 //  ページ制御
@@ -1126,6 +1180,7 @@ async function renderOvertimePage() {
       <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
       <td class="r" style="color:#58a6ff">${e.earlyM>0?m2hm(e.earlyM):'—'}</td>
       <td class="r" style="color:#d29922">${e.lateM>0?m2hm(e.lateM):'—'}</td>
+      <td class="r" style="color:#e67e22">${e.earlyLeaveM>0?m2hm(e.earlyLeaveM):'—'}</td>
       <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">
         <div class="ot-wrap" style="justify-content:flex-end">
           <div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div>
@@ -1212,7 +1267,7 @@ async function renderIndividualPage() {
       <span style="font-size:11px;color:#8b949e">最多残業月: ${maxOtP.otM>0?maxOtP.label+'（'+m2hm(maxOtP.otM)+'）':'データなし'}</span>
     </div>
     <table class="tbl">
-      <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
+      <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
       <tbody>`;
   pst.forEach(p=>{
     const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
@@ -1225,6 +1280,7 @@ async function renderIndividualPage() {
       <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
       <td class="r" style="color:#58a6ff">${p.earlyM>0?m2hm(p.earlyM):'—'}</td>
       <td class="r" style="color:#d29922">${p.lateM>0?m2hm(p.lateM):'—'}</td>
+      <td class="r" style="color:#e67e22">${p.earlyLeaveM>0?m2hm(p.earlyLeaveM):'—'}</td>
       <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">${p.otM>0?m2hm(p.otM):'—'}</td>
       <td><div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div><span style="font-size:11px;color:#8b949e">${pct}%</span></div></td>
       <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
@@ -1236,38 +1292,65 @@ async function renderIndividualPage() {
 function changeIndFY(d){ indFY+=d; renderIndividualPage(); }
 
 // ================================================================
-//  会社カレンダー
+//  会社カレンダー（マトリクス）
 // ================================================================
+function changeCalMonth(d){ calMonth+=d; if(calMonth>12){calYear++;calMonth=1;} if(calMonth<1){calYear--;calMonth=12;} renderCalendarPage(); }
+
 function renderCalendarPage() {
-  if (!KC.loaded) { document.getElementById('cal-tbody').innerHTML='<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:16px">読み込み中...</td></tr>'; return; }
-  const sorted=[...KC.calendar].sort((a,b)=>a.date.localeCompare(b.date));
-  document.getElementById('cal-count').textContent=`${sorted.length} 件`;
-  document.getElementById('cal-tbody').innerHTML=sorted.length?sorted.map((e,i)=>`
-    <tr><td>${e.date}</td><td><span class="tag" style="background:#1a2a3a;color:#58a6ff">${e.type}</span></td><td style="color:#8b949e">${e.memo||'—'}</td>
-    <td><button onclick="deleteCalEntry(${i})" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:13px">🗑</button></td></tr>`
-  ).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:16px">登録なし</td></tr>';
+  const lbl=document.getElementById('cal-month-label');
+  if(!lbl)return;
+  lbl.textContent=`${calYear}年${calMonth}月`;
+  const today=new Date().toLocaleDateString('sv');
+  const firstDow=new Date(calYear,calMonth-1,1).getDay();
+  const lastDate=new Date(calYear,calMonth,0).getDate();
+  const DOWS=['日','月','火','水','木','金','土'];
+  let html='<div class="kal-grid">';
+  DOWS.forEach((d,i)=>{ html+=`<div class="kal-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#8b949e'}">${d}</div>`; });
+  for(let i=0;i<firstDow;i++) html+='<div class="kal-cell kal-empty"></div>';
+  for(let d=1;d<=lastDate;d++){
+    const ds=`${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const nat=naturalDayState(ds);
+    const stored=KC.calendar.find(e=>e.date===ds);
+    const state=stored?stored.type:nat;
+    const jpName=jpHolidays[ds]||'';
+    const isToday=ds===today;
+    const dow=new Date(ds+'T00:00:00').getDay();
+    let cls='kal-cell', numCls='kal-num', sub='';
+    if(state==='sunday'||state==='saturday'||(state==='休日'&&(nat==='saturday'||nat==='sunday'))) { cls+=' kal-off'; }
+    else if(state==='休日') { cls+=' kal-off'; sub='<div class="kal-sub">休日</div>'; }
+    else if(state==='holiday'||state==='祝日') { cls+=' kal-holiday-jp'; sub=`<div class="kal-sub" style="color:#ff6b81">${jpName||'祝日'}</div>`; }
+    else if(state==='特別') { cls+=' kal-tokubetsu'; sub='<div class="kal-sub" style="color:#a78bfa">特別</div>'; }
+    else if(state==='通常'&&(nat==='saturday'||nat==='sunday')) { sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
+    else if(state==='通常'&&nat==='holiday') { sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
+    if(jpName&&state!=='holiday'&&state!=='祝日') sub+=`<div class="kal-sub" style="color:#ff6b81;font-size:8px">${jpName}</div>`;
+    if(dow===0) numCls+=' sun'; else if(dow===6) numCls+=' sat';
+    if(isToday) cls+=' kal-today';
+    html+=`<div class="${cls}" onclick="toggleCalDay('${ds}')"><div class="${numCls}">${d}</div>${sub}</div>`;
+  }
+  html+='</div>';
+  document.getElementById('cal-grid').innerHTML=html;
 }
-function openAddCalendar(){
-  document.getElementById('cal-date').value=new Date().toLocaleDateString('sv');
-  document.getElementById('cal-memo').value='';
-  document.getElementById('cal-modal').style.display='flex';
-}
-async function saveCalEntry(){
-  const date=document.getElementById('cal-date').value,type=document.getElementById('cal-type').value,memo=document.getElementById('cal-memo').value.trim();
-  if(!date){alert('日付を入力してください');return;}
-  KC.calendar=KC.calendar.filter(e=>!(e.date===date&&e.type===type));
-  KC.calendar.push({date,type,memo});
-  document.getElementById('cal-modal').style.display='none';
-  try{ await saveKSheet('会社カレンダー',KC.calendar.map(e=>[e.date,e.type,e.memo])); toast('📅 カレンダーを保存しました'); }
-  catch(e){ alert('保存エラー: '+e.message); }
-  renderCalendarPage();
-}
-async function deleteCalEntry(idx){
-  const sorted=[...KC.calendar].sort((a,b)=>a.date.localeCompare(b.date)),entry=sorted[idx];
-  if(!confirm(`${entry.date} (${entry.type}) を削除しますか？`))return;
-  KC.calendar=KC.calendar.filter(e=>!(e.date===entry.date&&e.type===entry.type));
-  try{ await saveKSheet('会社カレンダー',KC.calendar.map(e=>[e.date,e.type,e.memo])); toast('🗑 削除しました'); }
-  catch(e){ alert('削除エラー: '+e.message); }
+
+async function toggleCalDay(ds) {
+  const nat=naturalDayState(ds);
+  const stored=KC.calendar.find(e=>e.date===ds);
+  const cur=stored?stored.type:nat;
+  // Cycle: workday→休日→特別→通常(remove); weekend→通常(override)→null(remove); holiday→通常→null
+  let next=null;
+  if(nat==='saturday'||nat==='sunday') {
+    next=(cur==='saturday'||cur==='sunday'||cur==='休日')?'通常':null;
+  } else if(nat==='holiday') {
+    next=(cur==='holiday'||cur==='祝日')?'通常':null;
+  } else {
+    if(cur==='workday'||cur==='通常') next='休日';
+    else if(cur==='休日') next='特別';
+    else if(cur==='特別') next=null;
+    else next='休日';
+  }
+  KC.calendar=KC.calendar.filter(e=>e.date!==ds);
+  if(next!==null) KC.calendar.push({date:ds,type:next,memo:''});
+  try{ await saveKSheet('会社カレンダー',KC.calendar.map(e=>[e.date,e.type,e.memo])); }
+  catch(ex){ console.error(ex); }
   renderCalendarPage();
 }
 
@@ -1290,40 +1373,71 @@ function changeLpPeriod(d){
   document.getElementById('lp-period-label').textContent=`${fyLabel(lpFY)} ${p.label}（${p.tip}）`;
   renderLeavePlanPage();
 }
+
 function renderLeavePlanPage(){
   const empId=document.getElementById('lp-sel').value;
   if(!empId){document.getElementById('lp-content').innerHTML='<div style="text-align:center;padding:80px;color:#8b949e">↑ 社員を選択してください</div>';return;}
-  const ps=getPeriods(lpFY),p=ps[lpPIdx]||ps[0],ym=p.start.slice(0,7);
-  const leaves=[...KC.leaves].filter(l=>l.id===empId&&l.ym===ym).sort((a,b)=>a.date.localeCompare(b.date));
-  const plans=[...KC.otPlans].filter(l=>l.id===empId&&l.ym===ym).sort((a,b)=>a.date.localeCompare(b.date));
+  const ps=getPeriods(lpFY),p=ps[lpPIdx]||ps[0];
+  // Use calendar month of the period's midpoint
+  const mid=new Date(p.start+'T00:00:00');
+  mid.setDate(mid.getDate()+15);
+  lpCalYear=mid.getFullYear(); lpCalMonth=mid.getMonth()+1;
+  renderLpContent(empId);
+}
+
+function renderLpContent(empId){
+  if(!empId){empId=document.getElementById('lp-sel').value;}
+  const today=new Date().toLocaleDateString('sv');
+  const firstDow=new Date(lpCalYear,lpCalMonth-1,1).getDay();
+  const lastDate=new Date(lpCalYear,lpCalMonth,0).getDate();
+  const DOWS=['日','月','火','水','木','金','土'];
+  const leaveMap={};
+  KC.leaves.filter(l=>l.id===empId&&l.date.slice(0,7)===`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`).forEach(l=>{leaveMap[l.date]=l;});
+  const plans=[...KC.otPlans].filter(l=>l.id===empId&&l.date.slice(0,7)===`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`).sort((a,b)=>a.date.localeCompare(b.date));
+
+  let calHtml='<div class="kal-grid">';
+  DOWS.forEach((d,i)=>{ calHtml+=`<div class="kal-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#8b949e'}">${d}</div>`; });
+  for(let i=0;i<firstDow;i++) calHtml+='<div class="kal-cell kal-empty"></div>';
+  for(let d=1;d<=lastDate;d++){
+    const ds=`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=ds===today;
+    const dow=new Date(ds+'T00:00:00').getDay();
+    const nonWork=isHolidayDate(ds);
+    const leave=leaveMap[ds];
+    let cls='kal-cell', numCls='kal-num', sub='';
+    if(nonWork){ cls+=' kal-off kal-disabled'; }
+    else if(leave){
+      if(leave.type==='有休') { cls+=' kal-yuukyu'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#1a5a3a;color:#3fb950">有休</span></div>'; }
+      else if(leave.type==='半休AM') { cls+=' kal-hankyu-am'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#153a22;color:#2ea043">半休AM</span></div>'; }
+      else if(leave.type==='半休PM') { cls+=' kal-hankyu-pm'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#102a18;color:#238636">半休PM</span></div>'; }
+    }
+    const jpName=jpHolidays[ds]||'';
+    if(nonWork&&jpName) sub=`<div class="kal-sub" style="color:#ff6b81;font-size:8px">${jpName}</div>`;
+    if(dow===0&&!nonWork) numCls+=' sun'; else if(dow===6&&!nonWork) numCls+=' sat';
+    if(isToday) cls+=' kal-today';
+    const clickFn=nonWork?'':`onclick="toggleLeaveDay('${empId}','${ds}')"`;
+    calHtml+=`<div class="${cls}" ${clickFn}><div class="${numCls}">${d}</div>${sub}</div>`;
+  }
+  calHtml+='</div>';
+
+  const planRows=plans.length?plans.map(l=>`<tr><td>${l.date}</td><td class="r" style="color:#d29922">${l.hours}h</td><td style="color:#8b949e">${l.memo||'—'}</td><td><button onclick="deleteOtPlan('${empId}','',  '${l.date}')" style="background:none;border:none;color:#f85149;cursor:pointer">🗑</button></td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>';
+
   document.getElementById('lp-content').innerHTML=`
     <div class="card-row cols-2">
-      <div class="tbl-card">
-        <div class="tbl-hdr"><h3>🌴 有休取得</h3><button class="btn-export" onclick="openAddLeave('${empId}','${ym}')">＋ 追加</button></div>
-        <table class="tbl"><thead><tr><th>日付</th><th>種別</th><th>メモ</th><th></th></tr></thead>
-        <tbody>${leaves.length?leaves.map(l=>`<tr><td>${l.date}</td><td><span class="tag" style="background:#1a3a2a;color:#3fb950">${l.type}</span></td><td style="color:#8b949e">${l.memo||'—'}</td><td><button onclick="deleteLeave('${empId}','${ym}','${l.date}','${l.type}')" style="background:none;border:none;color:#f85149;cursor:pointer">🗑</button></td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>'}</tbody>
-        </table>
-      </div>
-      <div class="tbl-card">
-        <div class="tbl-hdr"><h3>📋 残業予定</h3><button class="btn-export" onclick="openAddOtPlan('${empId}','${ym}')">＋ 追加</button></div>
-        <table class="tbl"><thead><tr><th>日付</th><th>予定時間</th><th>メモ</th><th></th></tr></thead>
-        <tbody>${plans.length?plans.map(l=>`<tr><td>${l.date}</td><td class="r" style="color:#d29922">${l.hours}h</td><td style="color:#8b949e">${l.memo||'—'}</td><td><button onclick="deleteOtPlan('${empId}','${ym}','${l.date}')" style="background:none;border:none;color:#f85149;cursor:pointer">🗑</button></td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>'}</tbody>
-        </table>
-      </div>
-    </div>
-    <div id="lp-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:360px">
-        <h3 style="margin-bottom:16px">🌴 有休登録</h3>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
-        <input type="date" id="lp-leave-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">種別</label>
-        <select id="lp-leave-type" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px"><option value="有休">有休</option><option value="半休AM">半休AM</option><option value="半休PM">半休PM</option></select>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ</label>
-        <input type="text" id="lp-leave-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px">
-        <div style="display:flex;gap:8px">
-          <button onclick="saveLeave()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
-          <button onclick="document.getElementById('lp-leave-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
+      <div class="kal-wrap">
+        <div class="kal-legend">
+          <span><span class="kal-legend-dot" style="background:#1a3a2a"></span>有休</span>
+          <span><span class="kal-legend-dot" style="background:#163022"></span>半休AM</span>
+          <span><span class="kal-legend-dot" style="background:#122820"></span>半休PM</span>
+          <span><span class="kal-legend-dot" style="background:#1a1f27"></span>休日</span>
+          <span style="margin-left:auto;font-size:10px;color:#6e7681">クリックで切替</span>
         </div>
+        ${calHtml}
+      </div>
+      <div class="tbl-card">
+        <div class="tbl-hdr"><h3>📋 残業予定</h3><button class="btn-export" onclick="openAddOtPlanDirect('${empId}')">＋ 追加</button></div>
+        <table class="tbl"><thead><tr><th>日付</th><th>予定時間</th><th>メモ</th><th></th></tr></thead>
+        <tbody>${planRows}</tbody></table>
       </div>
     </div>
     <div id="lp-plan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
@@ -1342,41 +1456,46 @@ function renderLeavePlanPage(){
       </div>
     </div>`;
 }
-function openAddLeave(empId,ym){ _lpCurEmpId=empId; _lpCurYm=ym; document.getElementById('lp-leave-date').value=new Date().toLocaleDateString('sv'); document.getElementById('lp-leave-memo').value=''; document.getElementById('lp-leave-modal').style.display='flex'; }
-async function saveLeave(){
-  const date=document.getElementById('lp-leave-date').value,type=document.getElementById('lp-leave-type').value,memo=document.getElementById('lp-leave-memo').value.trim();
-  if(!date){alert('日付を入力してください');return;}
-  KC.leaves=KC.leaves.filter(l=>!(l.id===_lpCurEmpId&&l.ym===_lpCurYm&&l.date===date));
-  KC.leaves.push({id:_lpCurEmpId,ym:_lpCurYm,date,type,memo});
-  document.getElementById('lp-leave-modal').style.display='none';
-  try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🌴 有休を登録しました'); }
+async function toggleLeaveDay(empId, ds){
+  const ym=ds.slice(0,7);
+  const existing=KC.leaves.find(l=>l.id===empId&&l.date===ds);
+  const cur=existing?existing.type:null;
+  let next=null;
+  if(!cur) next='有休';
+  else if(cur==='有休') next='半休AM';
+  else if(cur==='半休AM') next='半休PM';
+  else next=null; // remove
+  KC.leaves=KC.leaves.filter(l=>!(l.id===empId&&l.date===ds));
+  if(next) KC.leaves.push({id:empId,ym,date:ds,type:next,memo:''});
+  try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🌴 有休を更新しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
-  renderLeavePlanPage();
+  renderLpContent(empId);
 }
-async function deleteLeave(empId,ym,date,type){
-  if(!confirm(`${date} (${type}) を削除しますか？`))return;
-  KC.leaves=KC.leaves.filter(l=>!(l.id===empId&&l.ym===ym&&l.date===date&&l.type===type));
-  try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🗑 削除しました'); }
-  catch(e){ alert('削除エラー: '+e.message); }
-  renderLeavePlanPage();
+
+function openAddOtPlanDirect(empId){
+  _lpCurEmpId=empId;
+  _lpCurYm=`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`;
+  document.getElementById('lp-plan-date').value=new Date().toLocaleDateString('sv');
+  document.getElementById('lp-plan-memo').value='';
+  document.getElementById('lp-plan-modal').style.display='flex';
 }
-function openAddOtPlan(empId,ym){ _lpCurEmpId=empId; _lpCurYm=ym; document.getElementById('lp-plan-date').value=new Date().toLocaleDateString('sv'); document.getElementById('lp-plan-memo').value=''; document.getElementById('lp-plan-modal').style.display='flex'; }
 async function saveOtPlan(){
   const date=document.getElementById('lp-plan-date').value,hours=parseFloat(document.getElementById('lp-plan-hours').value)||0,memo=document.getElementById('lp-plan-memo').value.trim();
   if(!date){alert('日付を入力してください');return;}
-  KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.ym===_lpCurYm&&l.date===date));
-  KC.otPlans.push({id:_lpCurEmpId,ym:_lpCurYm,date,hours,memo});
+  KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
+  KC.otPlans.push({id:_lpCurEmpId,ym:date.slice(0,7),date,hours,memo});
   document.getElementById('lp-plan-modal').style.display='none';
   try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo])); toast('📋 残業予定を登録しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
-  renderLeavePlanPage();
+  renderLpContent(_lpCurEmpId);
 }
+
 async function deleteOtPlan(empId,ym,date){
   if(!confirm(`${date} の残業予定を削除しますか？`))return;
-  KC.otPlans=KC.otPlans.filter(l=>!(l.id===empId&&l.ym===ym&&l.date===date));
+  KC.otPlans=KC.otPlans.filter(l=>!(l.id===empId&&l.date===date));
   try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo])); toast('🗑 削除しました'); }
   catch(e){ alert('削除エラー: '+e.message); }
-  renderLeavePlanPage();
+  renderLpContent(empId);
 }
 
 // ================================================================
@@ -1437,7 +1556,7 @@ async function startApp(spCfg, mc) {
     await initSP(spCfg);        setLoading('社員データを読み込み中...');
     employees=await loadEmployees();
     setLoading('管理ファイルを初期化中...');
-    await initKintaiMgmt(spCfg);
+    await Promise.all([initKintaiMgmt(spCfg), loadJpHolidays()]);
     showScreen('main');
     showPage('dashboard');
   } catch(e) {
