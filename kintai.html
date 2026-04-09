@@ -866,7 +866,7 @@ function renderGrid() {
         <div class="emp-name-wrap"><div class="emp-name">${emp.name}</div></div>
         <div class="emp-bottom">
           <span class="status-badge">${label}</span>
-          <span class="emp-time">${last ? last.time : '—'}</span>
+          <span class="emp-time">${last ? last.time.slice(0,5) : '—'}</span>
         </div>
       </div>
     `;
@@ -1220,7 +1220,7 @@ function showScreen(name) {
 }
 
 // ================================================================
-//  時計 ＋ 自動退勤（23:55）
+//  時計 ＋ 自動退勤（21:59）
 // ================================================================
 let autoLogoutExecutedDate = '';  // 自動退勤を実行した日付
 
@@ -1271,15 +1271,15 @@ function updateClock() {
   document.getElementById('date-display').textContent =
     `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${days[now.getDay()]}）`;
 
-  // ── 自動退勤：23:55になったら未退勤者を自動退勤 ──
+  // ── 自動退勤：21:59になったら未退勤者を自動退勤 ──
   const today = todayStr();
-  if (hhmm === '23:55' && autoLogoutExecutedDate !== today && employees.length > 0) {
+  if (hhmm === '21:59' && autoLogoutExecutedDate !== today && employees.length > 0) {
     autoLogoutExecutedDate = today;
     doAutoLogout(hms);
   }
 }
 
-// 23:55 自動退勤処理
+// 21:59 自動退勤処理
 async function doAutoLogout(timeStr) {
   const targets = employees.filter(emp => {
     const st = getStatus(emp.id);
@@ -1287,7 +1287,7 @@ async function doAutoLogout(timeStr) {
   });
   if (!targets.length) return;
 
-  showToast(`🕐 23:55 未退勤者${targets.length}名を自動退勤処理中...`, '#e67e22');
+  showToast(`🕐 21:59 未退勤者${targets.length}名を自動退勤処理中...`, '#e67e22');
   for (const emp of targets) {
     await registerAction(emp.id, '退勤', timeStr);
   }
@@ -1298,12 +1298,10 @@ async function doAutoLogout(timeStr) {
 //  データ更新（手動）
 // ================================================================
 async function refreshData() {
-  if (!confirm('データを更新しますか？\n（未保存の打刻状態はSharePointの内容に置き換わります）')) return;
   showToast('🔄 データを更新中...', '#3498db');
   try {
+    sheetNextRow = {};  // 行キャッシュを全リセット
     [employees, todayRecords] = await Promise.all([loadEmployees(), loadTodayRecords()]);
-    // 更新後に行キャッシュをリセット（次回書き込み時にSPから最新行数を再取得）
-    delete sheetNextRow[todayStr().slice(0, 7)];
     renderGrid();
     showToast('✅ 更新完了', '#27ae60');
   } catch(e) {
