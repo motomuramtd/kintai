@@ -175,6 +175,42 @@
     .kal-num.sun{color:#f85149}.kal-num.sat{color:#58a6ff}
     .kal-sub{font-size:9px;color:#8b949e;margin-top:2px;line-height:1.3;word-break:break-all}
     .kal-badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:8px;margin-top:2px;font-weight:700}
+
+    /* 会社休日の日付色（赤） */
+    .kal-num.off-day{color:#f85149 !important}
+
+    /* ビュー切替ボタン */
+    .cal-view-btn{padding:5px 13px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#8b949e;transition:all .1s;font-weight:600}
+    .cal-view-btn.active{background:#1c3a6e;color:#58a6ff;border-color:#58a6ff}
+    .cal-view-btn:hover:not(.active){background:#2d333b;color:#cdd9e5}
+
+    /* 年ビュー */
+    .kal-year-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .kal-mini{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px}
+    .kal-mini-title{font-size:12px;font-weight:700;color:#cdd9e5;text-align:center;margin-bottom:5px;cursor:pointer;padding:2px 0;border-radius:4px}
+    .kal-mini-title:hover{color:#58a6ff;background:#1c2128}
+    .kal-mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+    .kal-mini-dow{font-size:7px;text-align:center;color:#6e7681;padding:1px 0;font-weight:600}
+    .kal-mini-cell{font-size:9px;text-align:center;padding:2px 1px;border-radius:3px;cursor:pointer;min-height:15px;line-height:13px;color:#8b949e}
+    .kal-mini-cell:hover:not(.kal-empty){background:#21262d}
+    .kal-mini-cell.mn-work{color:#cdd9e5}
+    .kal-mini-cell.mn-off{color:#f85149;background:#1a1f27}
+    .kal-mini-cell.mn-hol{color:#ff6b81;background:#2a1520}
+    .kal-mini-cell.mn-sp{color:#a78bfa;background:#1a1a3a}
+    .kal-mini-cell.mn-today{outline:1px solid #58a6ff;outline-offset:-1px;border-radius:3px}
+
+    /* 週ビュー */
+    .kal-week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .kal-week-cell{min-height:110px;padding:10px 8px;border-radius:8px;border:1px solid #30363d;cursor:pointer;transition:border-color .1s,background .1s;background:#161b22}
+    .kal-week-cell:hover{border-color:#58a6ff}
+    .kal-week-cell.kal-today{border-color:#58a6ff !important;box-shadow:0 0 0 1px #58a6ff33}
+    .kal-week-cell.wk-off{background:#1a1f27}
+    .kal-week-cell.wk-hol{background:#2a1520}
+    .kal-week-cell.wk-sp{background:#1a1a3a}
+    .wk-dow{font-size:10px;color:#8b949e;margin-bottom:4px;font-weight:600}
+    .wk-num{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+    .wk-jp{font-size:9px;color:#ff6b81;margin-top:3px}
+    .wk-state{margin-top:8px;font-size:10px;padding:2px 8px;border-radius:10px;display:inline-block;font-weight:600}
   </style>
 </head>
 <body>
@@ -398,10 +434,15 @@
         <!-- ===== Calendar ===== -->
         <div class="page" id="page-calendar">
           <div class="period-bar">
-            <label>会社カレンダー</label>
-            <button class="pb-btn" onclick="changeCalMonth(-1)">◀</button>
+            <div style="display:flex;gap:4px;margin-right:8px">
+              <button class="cal-view-btn" id="cal-view-year" onclick="changeCalView('year')">年</button>
+              <button class="cal-view-btn active" id="cal-view-month" onclick="changeCalView('month')">月</button>
+              <button class="cal-view-btn" id="cal-view-week" onclick="changeCalView('week')">週</button>
+            </div>
+            <button class="pb-btn" onclick="changeCalNav(-1)">◀</button>
             <span id="cal-month-label" class="pb-label"></span>
-            <button class="pb-btn" onclick="changeCalMonth(1)">▶</button>
+            <button class="pb-btn" onclick="changeCalNav(1)">▶</button>
+            <button class="pb-btn" onclick="changeCalNav(0)" style="margin-left:8px;font-size:11px">今日</button>
           </div>
           <div class="kal-wrap">
             <div class="kal-legend">
@@ -745,6 +786,8 @@ async function loadJpHolidays() {
 
 // カレンダー月ナビ状態
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth()+1;
+let calView='month';
+let calWeekDate=new Date().toLocaleDateString('sv'); // ISO date in current week
 let lpCalYear=new Date().getFullYear(), lpCalMonth=new Date().getMonth()+1;
 
 // 日付の自然状態（過去登録なし時のデフォルト）
@@ -1294,13 +1337,64 @@ function changeIndFY(d){ indFY+=d; renderIndividualPage(); }
 // ================================================================
 //  会社カレンダー（マトリクス）
 // ================================================================
-function changeCalMonth(d){ calMonth+=d; if(calMonth>12){calYear++;calMonth=1;} if(calMonth<1){calYear--;calMonth=12;} renderCalendarPage(); }
 
-function renderCalendarPage() {
-  const lbl=document.getElementById('cal-month-label');
-  if(!lbl)return;
-  lbl.textContent=`${calYear}年${calMonth}月`;
+// ---- ヘルパー: 週の日曜日を返す ----
+function getWeekSunday(ds){
+  const d=new Date(ds+'T00:00:00');
+  d.setDate(d.getDate()-d.getDay());
+  return d.toLocaleDateString('sv');
+}
+
+// ---- ビュー切替 ----
+function changeCalView(v){
+  calView=v;
+  ['year','month','week'].forEach(x=>{
+    const btn=document.getElementById('cal-view-'+x);
+    if(btn) btn.classList.toggle('active',x===v);
+  });
+  renderCalendarPage();
+}
+
+// ---- ナビゲーション（年・月・週 共通） ----
+// d=0: 今日/今月/今年 に戻る
+function changeCalNav(d){
+  if(d===0){ // 今日へ
+    const now=new Date();
+    calYear=now.getFullYear(); calMonth=now.getMonth()+1;
+    calWeekDate=now.toLocaleDateString('sv');
+  } else if(calView==='year'){
+    calYear+=d;
+  } else if(calView==='month'){
+    calMonth+=d;
+    if(calMonth>12){calYear++;calMonth=1;}
+    if(calMonth<1){calYear--;calMonth=12;}
+  } else { // week
+    const ws=new Date(calWeekDate+'T00:00:00');
+    ws.setDate(ws.getDate()+d*7);
+    calWeekDate=ws.toLocaleDateString('sv');
+  }
+  renderCalendarPage();
+}
+// 後方互換
+function changeCalMonth(d){ changeCalNav(d); }
+
+// ---- オフ日の日付カラーを判定 ----
+function offDayNumCls(state,nat){
+  // 会社が休みの日 → off-day(赤), 特別 → 特別色
+  if(state==='holiday'||state==='祝日') return 'kal-num off-day';
+  if(state==='sunday'||state==='saturday') return 'kal-num off-day';
+  if(state==='休日') return 'kal-num off-day';
+  if(state==='特別') return 'kal-num'; // 特別は背景色で区別
+  // 通常(休日overrideあり)は白
+  return 'kal-num';
+}
+
+// ================================================================
+// 月ビュー
+// ================================================================
+function renderCalendarMonth(){
   const today=new Date().toLocaleDateString('sv');
+  document.getElementById('cal-month-label').textContent=`${calYear}年${calMonth}月`;
   const firstDow=new Date(calYear,calMonth-1,1).getDay();
   const lastDate=new Date(calYear,calMonth,0).getDate();
   const DOWS=['日','月','火','水','木','金','土'];
@@ -1314,21 +1408,126 @@ function renderCalendarPage() {
     const state=stored?stored.type:nat;
     const jpName=jpHolidays[ds]||'';
     const isToday=ds===today;
-    const dow=new Date(ds+'T00:00:00').getDay();
-    let cls='kal-cell', numCls='kal-num', sub='';
-    if(state==='sunday'||state==='saturday'||(state==='休日'&&(nat==='saturday'||nat==='sunday'))) { cls+=' kal-off'; }
-    else if(state==='休日') { cls+=' kal-off'; sub='<div class="kal-sub">休日</div>'; }
-    else if(state==='holiday'||state==='祝日') { cls+=' kal-holiday-jp'; sub=`<div class="kal-sub" style="color:#ff6b81">${jpName||'祝日'}</div>`; }
-    else if(state==='特別') { cls+=' kal-tokubetsu'; sub='<div class="kal-sub" style="color:#a78bfa">特別</div>'; }
-    else if(state==='通常'&&(nat==='saturday'||nat==='sunday')) { sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
-    else if(state==='通常'&&nat==='holiday') { sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
+    let cls='kal-cell', sub='';
+    const numCls=offDayNumCls(state,nat);
+    if(state==='sunday'||state==='saturday'||(state==='休日'&&(nat==='saturday'||nat==='sunday'))){ cls+=' kal-off'; }
+    else if(state==='休日'){ cls+=' kal-off'; sub='<div class="kal-sub">休日</div>'; }
+    else if(state==='holiday'||state==='祝日'){ cls+=' kal-holiday-jp'; sub=`<div class="kal-sub" style="color:#ff6b81">${jpName||'祝日'}</div>`; }
+    else if(state==='特別'){ cls+=' kal-tokubetsu'; sub='<div class="kal-sub" style="color:#a78bfa">特別</div>'; }
+    else if(state==='通常'&&(nat==='saturday'||nat==='sunday')){ sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
+    else if(state==='通常'&&nat==='holiday'){ sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
     if(jpName&&state!=='holiday'&&state!=='祝日') sub+=`<div class="kal-sub" style="color:#ff6b81;font-size:8px">${jpName}</div>`;
-    if(dow===0) numCls+=' sun'; else if(dow===6) numCls+=' sat';
     if(isToday) cls+=' kal-today';
     html+=`<div class="${cls}" onclick="toggleCalDay('${ds}')"><div class="${numCls}">${d}</div>${sub}</div>`;
   }
   html+='</div>';
   document.getElementById('cal-grid').innerHTML=html;
+}
+
+// ================================================================
+// 年ビュー（12ヶ月一覧）
+// ================================================================
+function renderCalendarYear(){
+  document.getElementById('cal-month-label').textContent=`${calYear}年`;
+  const today=new Date().toLocaleDateString('sv');
+  const DOWS=['日','月','火','水','木','金','土'];
+  let html='<div class="kal-year-grid">';
+  for(let m=1;m<=12;m++){
+    const firstDow=new Date(calYear,m-1,1).getDay();
+    const lastDate=new Date(calYear,m,0).getDate();
+    html+=`<div class="kal-mini">`;
+    html+=`<div class="kal-mini-title" onclick="calMonth=${m};changeCalView('month')">${m}月</div>`;
+    html+='<div class="kal-mini-grid">';
+    DOWS.forEach((d,i)=>{ html+=`<div class="kal-mini-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#6e7681'}">${d}</div>`; });
+    for(let i=0;i<firstDow;i++) html+='<div class="kal-mini-cell kal-empty"></div>';
+    for(let d=1;d<=lastDate;d++){
+      const ds=`${calYear}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const state=calDayState(ds);
+      const isToday=ds===today;
+      let cls='kal-mini-cell';
+      if(state==='sunday'||state==='saturday'||state==='休日') cls+=' mn-off';
+      else if(state==='holiday'||state==='祝日') cls+=' mn-hol';
+      else if(state==='特別') cls+=' mn-sp';
+      else cls+=' mn-work';
+      if(isToday) cls+=' mn-today';
+      html+=`<div class="${cls}" onclick="calMonth=${m};calYear=${calYear};calWeekDate='${ds}';changeCalView('month')" title="${ds}">${d}</div>`;
+    }
+    html+='</div></div>';
+  }
+  html+='</div>';
+  document.getElementById('cal-grid').innerHTML=html;
+}
+
+// ================================================================
+// 週ビュー
+// ================================================================
+function renderCalendarWeek(){
+  const sunday=getWeekSunday(calWeekDate);
+  const sunD=new Date(sunday+'T00:00:00');
+  const satD=new Date(sunday+'T00:00:00'); satD.setDate(satD.getDate()+6);
+  const fmt=d=>`${d.getMonth()+1}月${d.getDate()}日`;
+  document.getElementById('cal-month-label').textContent=
+    `${sunD.getFullYear()}年${fmt(sunD)}（日）〜${fmt(satD)}（土）`;
+  const today=new Date().toLocaleDateString('sv');
+  const DOWS=['日','月','火','水','木','金','土'];
+  let html='<div class="kal-week-grid">';
+  for(let i=0;i<7;i++){
+    const cd=new Date(sunday+'T00:00:00'); cd.setDate(cd.getDate()+i);
+    const ds=cd.toLocaleDateString('sv');
+    const nat=naturalDayState(ds);
+    const stored=KC.calendar.find(e=>e.date===ds);
+    const state=stored?stored.type:nat;
+    const jpName=jpHolidays[ds]||'';
+    const isToday=ds===today;
+    const dow=cd.getDay();
+    let cls='kal-week-cell';
+    let numColor;
+    let stateBadge='';
+    if(state==='sunday'||state==='saturday'||(state==='休日'&&(nat==='saturday'||nat==='sunday'))){
+      cls+=' wk-off'; numColor='#f85149';
+      const lbl=nat==='saturday'?'土曜':nat==='sunday'?'日曜':'週末';
+      stateBadge=`<span class="wk-state" style="background:#1e2730;color:#6e7681">${lbl}</span>`;
+    } else if(state==='休日'){
+      cls+=' wk-off'; numColor='#f85149';
+      stateBadge=`<span class="wk-state" style="background:#1e2730;color:#f85149">休日</span>`;
+    } else if(state==='holiday'||state==='祝日'){
+      cls+=' wk-hol'; numColor='#ff6b81';
+      stateBadge=`<span class="wk-state" style="background:#2a1520;color:#ff6b81">${jpName||'祝日'}</span>`;
+    } else if(state==='特別'){
+      cls+=' wk-sp'; numColor='#f85149';
+      stateBadge=`<span class="wk-state" style="background:#1a1a3a;color:#a78bfa">特別</span>`;
+    } else if(state==='通常'&&(nat==='saturday'||nat==='sunday')){
+      numColor='#e6edf3';
+      stateBadge=`<span class="wk-state" style="background:#1a3a2a;color:#3fb950">出勤（振替）</span>`;
+    } else if(state==='通常'&&nat==='holiday'){
+      numColor='#e6edf3';
+      stateBadge=`<span class="wk-state" style="background:#1a3a2a;color:#3fb950">出勤（祝）</span>`;
+    } else {
+      numColor='#e6edf3';
+      stateBadge=`<span class="wk-state" style="background:#1c2128;color:#3fb950">通常</span>`;
+    }
+    const jpExtra=jpName&&state!=='holiday'&&state!=='祝日'?`<div class="wk-jp">${jpName}</div>`:'';
+    if(isToday) cls+=' kal-today';
+    html+=`<div class="${cls}" onclick="toggleCalDay('${ds}')">
+      <div class="wk-dow" style="color:${dow===0?'#f85149':dow===6?'#58a6ff':'#8b949e'}">${DOWS[dow]}</div>
+      <div class="wk-num" style="color:${numColor}">${cd.getDate()}</div>
+      ${jpExtra}
+      ${stateBadge}
+    </div>`;
+  }
+  html+='</div>';
+  document.getElementById('cal-grid').innerHTML=html;
+}
+
+// ================================================================
+// renderCalendarPage: ビューに応じて分岐
+// ================================================================
+function renderCalendarPage(){
+  const lbl=document.getElementById('cal-month-label');
+  if(!lbl)return;
+  if(calView==='year') renderCalendarYear();
+  else if(calView==='week') renderCalendarWeek();
+  else renderCalendarMonth();
 }
 
 async function toggleCalDay(ds) {
