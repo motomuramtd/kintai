@@ -973,11 +973,33 @@ async function loadKC() {
 
 async function saveKSheet(sheet, rows) {
   const headers={'会社カレンダー':['日付','種別','メモ'],'有休管理':['社員ID','月度','日付','種別','メモ'],'残業予定':['社員ID','月度','日付','予定時間(h)','メモ']}[sheet];
+  const nc=headers.length;
+  const ec=String.fromCharCode(64+nc);
+
+  // values = ヘッダー + データ行。必ず2行以上にする（1行だとrange指定が空になるケースを防ぐ）
   const values=[headers,...rows];
-  const ec=String.fromCharCode(64+headers.length);
-  const er=Math.max(values.length,2);
-  // First clear extra rows if any
-  await gPatch(`/drives/${kDriveId}/items/${kItemId}/workbook/worksheets('${sheet}')/range(address='A1:${ec}${er}')`,{values});
+  if(values.length<2) values.push(Array(nc).fill(''));
+  const writeRows=values.length;
+
+  // ── 既存行数を確認し、書き込み行より多ければ余剰行をクリア（削除時のゴーストデータ防止） ──
+  try{
+    const rng=await gGet(`/drives/${kDriveId}/items/${kItemId}/workbook/worksheets('${sheet}')/usedRange`);
+    const existRows=(rng.values||[]).length;
+    if(existRows>writeRows){
+      const clearCount=existRows-writeRows;
+      const clearVals=Array(clearCount).fill(null).map(()=>Array(nc).fill(''));
+      await gPatch(
+        `/drives/${kDriveId}/items/${kItemId}/workbook/worksheets('${sheet}')/range(address='A${writeRows+1}:${ec}${existRows}')`,
+        {values:clearVals}
+      );
+    }
+  }catch(e){ /* シートが存在しない場合は無視 */ }
+
+  // ── データ書き込み（行数と配列サイズを必ず一致させる） ──
+  await gPatch(
+    `/drives/${kDriveId}/items/${kItemId}/workbook/worksheets('${sheet}')/range(address='A1:${ec}${writeRows}')`,
+    {values}
+  );
 }
 
 // ================================================================
