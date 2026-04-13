@@ -121,6 +121,16 @@
     .ot-bar{flex:0 0 100px;height:5px;background:#21262d;border-radius:3px;overflow:hidden}
     .ot-fill{height:100%;border-radius:3px}.ot-ok{background:#3fb950}.ot-warn{background:#d29922}.ot-danger{background:#f85149}
 
+    /* ===== View toggle (個人詳細) ===== */
+    .ind-view-btn{padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#8b949e;font-weight:600;transition:all .1s}
+    .ind-view-btn.active{background:#1c3a6e;color:#58a6ff;border-color:#58a6ff}
+    .ind-view-btn:hover:not(.active){background:#2d333b;color:#cdd9e5}
+    /* 日別テーブル: 休日行 */
+    .day-row-off td{background:#1a1f27;color:#6e7681}
+    .day-row-off td:first-child{color:#8b949e}
+    /* 日別テーブル: 稼働なし */
+    .day-row-nowork td{color:#4a5060}
+
     /* ===== Period toolbar ===== */
     .period-bar{display:flex;align-items:center;gap:10px;padding:10px 0 16px;flex-wrap:wrap}
     .period-bar label{font-size:12px;color:#8b949e}
@@ -797,6 +807,8 @@ function workdays(start, end) {
 // ================================================================
 let employees=[], dashInited=false;
 let monthlyFY=getFY(), otFY=getFY(), otPIdx=null, indFY=getFY();
+let indView='monthly'; // 'monthly' | 'daily'
+let indDailyPIdx=null; // 日別表示の選択月度インデックス
 let chTrend=null, chGroup=null;
 let otGroupFilter='';
 const GROUP_ORDER=['第一','第二','第三','品証','出荷','生管','営業','総務'];
@@ -1135,7 +1147,7 @@ function renderMiniGrid(todayMap) {
       else if (last.type==='退勤') st='done';
     }
     const label={none:'未出勤',in:'出勤中',out:'外出中',done:'退勤済'}[st];
-    const time = last ? last.time : '';
+    const time = last ? last.time.slice(0,5) : ''; // 秒を削除 HH:MM のみ表示
     const card = document.createElement('div');
     card.className = `mini-card mc-${st}`;
     card.innerHTML = `
@@ -1338,6 +1350,21 @@ function initIndPage() {
   document.getElementById('ind-fy-label').textContent=`${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9）`;
   if (sel.value) renderIndividualPage();
 }
+// ── 個人詳細ビュー切替 ──
+function setIndView(v){
+  indView=v;
+  renderIndividualPage();
+}
+function changeIndDailyP(d){
+  const periods=getPeriods(indFY);
+  if(indDailyPIdx===null){ const now=new Date(); indDailyPIdx=periods.findIndex(p=>new Date(p.start+'T00:00:00')<=now&&now<=new Date(p.end+'T00:00:00')); if(indDailyPIdx<0)indDailyPIdx=periods.length-1; }
+  indDailyPIdx+=d;
+  if(indDailyPIdx<0){indFY--;indDailyPIdx=11;}
+  else if(indDailyPIdx>=12){indFY++;indDailyPIdx=0;}
+  document.getElementById('ind-fy-label').textContent=`${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9）`;
+  renderIndividualPage();
+}
+
 async function renderIndividualPage() {
   const empId=document.getElementById('ind-sel').value;
   if (!empId){ document.getElementById('ind-content').innerHTML='<div style="text-align:center;padding:80px;color:#8b949e">↑ 社員を選択してください</div>'; return; }
@@ -1346,51 +1373,168 @@ async function renderIndividualPage() {
   document.getElementById('ind-content').innerHTML='<div style="text-align:center;padding:40px;color:#8b949e">読み込み中...</div>';
 
   const periods=getPeriods(indFY);
-  await ensureSheets(sheetsFor(periods));
   const otLimit=(MC.otLimit||45)*60;
-  const pst=periods.map(p=>({ ...p, ...aggPeriod(empId,p.start,p.end) }));
 
-  const totDays=pst.reduce((s,p)=>s+p.days,0);
-  const totWork=pst.reduce((s,p)=>s+p.workM,0);
-  const totOt  =pst.reduce((s,p)=>s+p.otM,0);
-  const maxOtP =pst.reduce((a,b)=>a.otM>b.otM?a:b);
+  // 月別サマリー
+  if(indView==='monthly'){
+    await ensureSheets(sheetsFor(periods));
+    const pst=periods.map(p=>({ ...p, ...aggPeriod(empId,p.start,p.end) }));
+    const totDays=pst.reduce((s,p)=>s+p.days,0);
+    const totWork=pst.reduce((s,p)=>s+p.workM,0);
+    const totOt  =pst.reduce((s,p)=>s+p.otM,0);
+    const maxOtP =pst.reduce((a,b)=>a.otM>b.otM?a:b);
+    let html=`
+    <div class="card-row cols-4" style="margin-bottom:18px">
+      <div class="card"><h3>${emp.name}（${emp.group||'—'}）</h3><div class="card-val c-blue">${empId}</div><div class="card-sub">${emp.shift?`🕐 シフト: ${emp.shift}`:'通常勤務'}</div></div>
+      <div class="card"><h3>年間出勤日数</h3><div class="card-val">${totDays}日</div></div>
+      <div class="card"><h3>年間実働時間</h3><div class="card-val">${totWork>0?m2hm(totWork):'—'}</div></div>
+      <div class="card"><h3>年間残業時間</h3><div class="card-val c-yellow">${totOt>0?m2hm(totOt):'—'}</div></div>
+    </div>
+    <div class="tbl-card">
+      <div class="tbl-hdr">
+        <h3>📆 ${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9） 月別サマリー</h3>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;color:#8b949e">最多残業月: ${maxOtP.otM>0?maxOtP.label+'（'+m2hm(maxOtP.otM)+'）':'データなし'}</span>
+          <button class="ind-view-btn active" onclick="setIndView('monthly')">月別</button>
+          <button class="ind-view-btn" onclick="setIndView('daily')">日別</button>
+        </div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
+        <tbody>`;
+    pst.forEach(p=>{
+      const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
+      const tCls={ok:'t-ok',warn:'t-warn',danger:'t-danger'}[cls];
+      const pct=otLimit>0?Math.min(100,Math.round(p.otM/otLimit*100)):0;
+      html+=`<tr style="cursor:pointer" onclick="indDailyPIdx=${periods.indexOf(p)};setIndView('daily')" title="日別を表示">
+        <td style="font-weight:600">${p.label}</td>
+        <td style="color:#8b949e;font-size:11px">${p.tip}</td>
+        <td class="r">${p.days>0?p.days+'日':'—'}</td>
+        <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
+        <td class="r" style="color:#58a6ff">${p.earlyM>0?m2hm(p.earlyM):'—'}</td>
+        <td class="r" style="color:#d29922">${p.lateM>0?m2hm(p.lateM):'—'}</td>
+        <td class="r" style="color:#e67e22">${p.earlyLeaveM>0?m2hm(p.earlyLeaveM):'—'}</td>
+        <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">${p.otM>0?m2hm(p.otM):'—'}</td>
+        <td><div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div><span style="font-size:11px;color:#8b949e">${pct}%</span></div></td>
+        <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    document.getElementById('ind-content').innerHTML=html;
+    return;
+  }
 
+  // ── 日別ビュー ──
+  if(indDailyPIdx===null){
+    const now=new Date();
+    indDailyPIdx=periods.findIndex(p=>new Date(p.start+'T00:00:00')<=now&&now<=new Date(p.end+'T00:00:00'));
+    if(indDailyPIdx<0) indDailyPIdx=periods.length-1;
+  }
+  const pidx=Math.max(0,Math.min(indDailyPIdx,periods.length-1));
+  const p=periods[pidx];
+  const today=new Date().toLocaleDateString('sv');
+  // 当該月度の全シートをロード
+  const sheetNms=[...new Set([p.start.slice(0,7),p.end.slice(0,7)])];
+  await ensureSheets(sheetNms);
+  const agg=aggPeriod(empId,p.start,p.end);
+
+  // 日付リストを生成
+  const dates=[];
+  let dx=new Date(p.start+'T00:00:00');
+  const ed=new Date(p.end+'T00:00:00');
+  while(dx<=ed){ dates.push(dx.toLocaleDateString('sv')); dx.setDate(dx.getDate()+1); }
+
+  const DOWS=['日','月','火','水','木','金','土'];
   let html=`
-  <div class="card-row cols-4" style="margin-bottom:18px">
+  <div class="card-row cols-4" style="margin-bottom:14px">
     <div class="card"><h3>${emp.name}（${emp.group||'—'}）</h3><div class="card-val c-blue">${empId}</div><div class="card-sub">${emp.shift?`🕐 シフト: ${emp.shift}`:'通常勤務'}</div></div>
-    <div class="card"><h3>年間出勤日数</h3><div class="card-val">${totDays}日</div></div>
-    <div class="card"><h3>年間実働時間</h3><div class="card-val">${totWork>0?m2hm(totWork):'—'}</div></div>
-    <div class="card"><h3>年間残業時間</h3><div class="card-val c-yellow">${totOt>0?m2hm(totOt):'—'}</div></div>
+    <div class="card"><h3>${p.label} 出勤日数</h3><div class="card-val">${agg.days}日</div></div>
+    <div class="card"><h3>${p.label} 実働時間</h3><div class="card-val">${agg.workM>0?m2hm(agg.workM):'—'}</div></div>
+    <div class="card"><h3>${p.label} 残業合計</h3><div class="card-val c-yellow">${agg.otM>0?m2hm(agg.otM):'—'}</div></div>
   </div>
   <div class="tbl-card">
     <div class="tbl-hdr">
-      <h3>📆 ${fyLabel(indFY)}（${indFY}/10〜${indFY+1}/9） 月別サマリー</h3>
-      <span style="font-size:11px;color:#8b949e">最多残業月: ${maxOtP.otM>0?maxOtP.label+'（'+m2hm(maxOtP.otM)+'）':'データなし'}</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="pb-btn" onclick="changeIndDailyP(-1)">◀</button>
+        <span style="font-size:14px;font-weight:700;min-width:200px;text-align:center">${p.label}（${p.tip}）</span>
+        <button class="pb-btn" onclick="changeIndDailyP(1)">▶</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="ind-view-btn" onclick="setIndView('monthly')">月別</button>
+        <button class="ind-view-btn active" onclick="setIndView('daily')">日別</button>
+      </div>
     </div>
+    <div style="overflow-x:auto">
     <table class="tbl">
-      <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
+      <thead><tr>
+        <th>日付</th><th>曜</th>
+        <th class="r">出勤</th><th class="r">退勤</th>
+        <th class="r">実働</th>
+        <th class="r" style="color:#58a6ff">早出</th>
+        <th class="r" style="color:#d29922">残業</th>
+        <th class="r" style="color:#f0a030">遅刻</th>
+        <th class="r" style="color:#e67e22">早退</th>
+        <th>状況</th>
+      </tr></thead>
       <tbody>`;
-  pst.forEach(p=>{
-    const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
-    const tCls={ok:'t-ok',warn:'t-warn',danger:'t-danger'}[cls];
-    const pct=otLimit>0?Math.min(100,Math.round(p.otM/otLimit*100)):0;
-    html+=`<tr>
-      <td style="font-weight:600">${p.label}</td>
-      <td style="color:#8b949e;font-size:11px">${p.tip}</td>
-      <td class="r">${p.days>0?p.days+'日':'—'}</td>
-      <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
-      <td class="r" style="color:#58a6ff">${p.earlyM>0?m2hm(p.earlyM):'—'}</td>
-      <td class="r" style="color:#d29922">${p.lateM>0?m2hm(p.lateM):'—'}</td>
-      <td class="r" style="color:#e67e22">${p.earlyLeaveM>0?m2hm(p.earlyLeaveM):'—'}</td>
-      <td class="r ${cls!=='ok'?'c-'+cls+'-cell':''}">${p.otM>0?m2hm(p.otM):'—'}</td>
-      <td><div class="ot-wrap"><div class="ot-bar"><div class="ot-fill ot-${cls}" style="width:${pct}%"></div></div><span style="font-size:11px;color:#8b949e">${pct}%</span></div></td>
-      <td><span class="tag ${tCls}">${cls==='danger'?'超過':cls==='warn'?'注意':'正常'}</span></td>
-    </tr>`;
+
+  dates.forEach(ds=>{
+    const dow=new Date(ds+'T00:00:00').getDay();
+    const offDay=isHolidayDate(ds);
+    const logs=dayRecs(ds,empId);
+    const st=calcDay(logs,emp);
+    const isToday=ds===today;
+    const hasPunch=logs.some(l=>l.type==='出勤');
+    const dowLabel=DOWS[dow];
+    const dowColor=dow===0?'#f85149':dow===6?'#58a6ff':'#cdd9e5';
+    const dateLabel=ds.slice(5).replace('-','/');
+    const todaySty=isToday?'border-left:3px solid #58a6ff':'';
+
+    if(offDay){
+      // 休日行
+      const calState=calDayState(ds);
+      const offLabel=calState==='臨時休業'?'臨時休業':calState==='計画有休'?'計画有休':dow===0?'日曜':dow===6?'土曜':'休日';
+      const jpN=jpHolidays[ds]?` (${jpHolidays[ds]})`:'';
+      html+=`<tr class="day-row-off" style="${todaySty}">
+        <td style="color:${isToday?'#58a6ff':'#8b949e'}">${dateLabel}</td>
+        <td style="color:${dowColor}">${dowLabel}</td>
+        <td colspan="7" style="text-align:center;color:#4a5060">${hasPunch&&st?`${st.inT||'—'} → ${st.outT||'未退勤'}（出勤記録あり）`:`${offLabel}${jpN}`}</td>
+        <td>${hasPunch?'<span class="tag t-warn">出勤</span>':'<span class="tag t-muted">休日</span>'}</td>
+      </tr>`;
+    } else if(!st||st.workM===null){
+      // 欠勤 or 打刻なし
+      const hasIn=logs.some(l=>l.type==='出勤');
+      html+=`<tr class="day-row-nowork" style="${todaySty}">
+        <td style="color:${isToday?'#58a6ff':'inherit'}">${dateLabel}</td>
+        <td style="color:${dowColor}">${dowLabel}</td>
+        <td class="r">${hasIn?logs.find(l=>l.type==='出勤').time.slice(0,5):'—'}</td>
+        <td class="r">—</td>
+        <td colspan="5" style="text-align:center;color:#4a5060">${hasIn?'退勤打刻なし':'打刻なし'}</td>
+        <td><span class="tag t-muted">${hasIn?'退勤未':'欠勤'}</span></td>
+      </tr>`;
+    } else {
+      // 通常出勤
+      const otCls=st.otM>=(otLimit||45*60)?'danger':st.otM>=(otLimit||45*60)*.8?'warn':'ok';
+      const lateCell=st.lateArrM>0?`<td class="r" style="color:#f0a030">${m2hm(st.lateArrM)}</td>`:`<td class="r c-muted">—</td>`;
+      const elCell=st.earlyLeaveM>0?`<td class="r" style="color:#e67e22">${m2hm(st.earlyLeaveM)}</td>`:`<td class="r c-muted">—</td>`;
+      html+=`<tr style="${todaySty}">
+        <td style="color:${isToday?'#58a6ff':'inherit'}">${dateLabel}</td>
+        <td style="color:${dowColor}">${dowLabel}</td>
+        <td class="r">${st.inT}</td>
+        <td class="r">${st.outT||'—'}</td>
+        <td class="r">${m2hm(st.workM)}</td>
+        <td class="r" style="color:#58a6ff">${st.earlyM>0?m2hm(st.earlyM):'—'}</td>
+        <td class="r ${otCls!=='ok'?'c-'+otCls+'-cell':''}">${st.lateM>0?m2hm(st.lateM):'—'}</td>
+        ${lateCell}${elCell}
+        <td><span class="tag t-ok">出勤</span></td>
+      </tr>`;
+    }
   });
-  html+=`</tbody></table></div>`;
+
+  html+=`</tbody></table></div></div>`;
   document.getElementById('ind-content').innerHTML=html;
 }
-function changeIndFY(d){ indFY+=d; renderIndividualPage(); }
+function changeIndFY(d){ indFY+=d; indDailyPIdx=null; renderIndividualPage(); }
 
 // ================================================================
 //  会社カレンダー（マトリクス）
