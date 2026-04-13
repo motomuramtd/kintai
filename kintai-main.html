@@ -165,7 +165,9 @@
     .kal-cell.kal-today{border-color:#58a6ff !important;box-shadow:0 0 0 1px #58a6ff22}
     .kal-cell.kal-off{background:#1a1f27}
     .kal-cell.kal-holiday-jp{background:#2a1520}
-    .kal-cell.kal-tokubetsu{background:#1a1a3a}
+    .kal-cell.kal-rinkyuu{background:#2a1010}   /* 臨時休業 */
+    .kal-cell.kal-keikaku{background:#1a2a10}   /* 計画有休 */
+    .kal-cell.kal-tokubetsu{background:#1a1a3a} /* 旧互換 */
     .kal-cell.kal-yuukyu{background:#1a3a2a}
     .kal-cell.kal-hankyu-am{background:#163022}
     .kal-cell.kal-hankyu-pm{background:#122820}
@@ -194,9 +196,11 @@
     .kal-mini-cell{font-size:9px;text-align:center;padding:2px 1px;border-radius:3px;cursor:pointer;min-height:15px;line-height:13px;color:#8b949e}
     .kal-mini-cell:hover:not(.kal-empty){background:#21262d}
     .kal-mini-cell.mn-work{color:#cdd9e5}
-    .kal-mini-cell.mn-off{color:#f85149;background:#1a1f27}
-    .kal-mini-cell.mn-hol{color:#ff6b81;background:#2a1520}
-    .kal-mini-cell.mn-sp{color:#a78bfa;background:#1a1a3a}
+    .kal-mini-cell.mn-off{color:#f85149;background:#1a1f27}   /* 土日 */
+    .kal-mini-cell.mn-rin{color:#ff9090;background:#2a1010}   /* 臨時休業 */
+    .kal-mini-cell.mn-kei{color:#90d090;background:#1a2a10}   /* 計画有休 */
+    .kal-mini-cell.mn-hol{color:#ff6b81;background:#2a1520}   /* 旧互換 */
+    .kal-mini-cell.mn-sp{color:#a78bfa;background:#1a1a3a}    /* 旧互換 */
     .kal-mini-cell.mn-today{outline:1px solid #58a6ff;outline-offset:-1px;border-radius:3px}
 
     /* 週ビュー */
@@ -204,9 +208,11 @@
     .kal-week-cell{min-height:110px;padding:10px 8px;border-radius:8px;border:1px solid #30363d;cursor:pointer;transition:border-color .1s,background .1s;background:#161b22}
     .kal-week-cell:hover{border-color:#58a6ff}
     .kal-week-cell.kal-today{border-color:#58a6ff !important;box-shadow:0 0 0 1px #58a6ff33}
-    .kal-week-cell.wk-off{background:#1a1f27}
-    .kal-week-cell.wk-hol{background:#2a1520}
-    .kal-week-cell.wk-sp{background:#1a1a3a}
+    .kal-week-cell.wk-off{background:#1a1f27}    /* 土日 */
+    .kal-week-cell.wk-rin{background:#2a1010}    /* 臨時休業 */
+    .kal-week-cell.wk-kei{background:#1a2a10}    /* 計画有休 */
+    .kal-week-cell.wk-hol{background:#2a1520}    /* 旧互換 */
+    .kal-week-cell.wk-sp{background:#1a1a3a}     /* 旧互換 */
     .wk-dow{font-size:10px;color:#8b949e;margin-bottom:4px;font-weight:600}
     .wk-num{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
     .wk-jp{font-size:9px;color:#ff6b81;margin-top:3px}
@@ -327,7 +333,7 @@
           <div class="card-row cols-3" id="dash-cards">
             <div class="card"><h3>本日の出勤</h3><div class="card-val c-blue" id="d-today">—</div><div class="card-sub" id="d-today-sub">—</div></div>
             <div class="card"><h3>今月の残業合計</h3><div class="card-val c-yellow" id="d-ot-total">—</div><div class="card-sub" id="d-ot-sub">—</div></div>
-            <div class="card"><h3>出勤人数（直近3日間）</h3><div id="d-headcount-list" style="margin-top:4px"></div></div>
+            <div class="card"><h3>出勤人数（直近稼働3日）</h3><div id="d-headcount-list" style="margin-top:4px"></div></div>
           </div>
           <!-- チャート -->
           <div class="card-row cols-2">
@@ -407,7 +413,7 @@
             <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
             <div style="overflow-x:auto">
               <table class="tbl">
-                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
+                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
                 <tbody id="ot-detail-tbody"></tbody>
               </table>
             </div>
@@ -446,11 +452,12 @@
           </div>
           <div class="kal-wrap">
             <div class="kal-legend">
-              <span><span class="kal-legend-dot" style="background:#1a1f27"></span>休日</span>
-              <span><span class="kal-legend-dot" style="background:#2a1520"></span>祝日</span>
-              <span><span class="kal-legend-dot" style="background:#1a1a3a"></span>特別</span>
+              <span><span class="kal-legend-dot" style="background:#1a1f27"></span>土日</span>
+              <span><span class="kal-legend-dot" style="background:#2a1010"></span>臨時休業</span>
+              <span><span class="kal-legend-dot" style="background:#1a2a10"></span>計画有休</span>
               <span><span class="kal-legend-dot" style="background:#161b22;border:1px solid #58a6ff"></span>今日</span>
-              <span style="margin-left:auto;color:#6e7681">日付をクリックして状態切り替え</span>
+              <span style="color:#ff9050;font-size:11px">🗓 祝日名はオレンジで表示（デフォルト出勤）</span>
+              <span style="margin-left:auto;color:#6e7681">クリック: 出勤→臨時休業→計画有休→出勤</span>
             </div>
             <div id="cal-grid"></div>
           </div>
@@ -568,8 +575,14 @@ async function initSP(cfg) {
 
 async function loadEmployees() {
   const rng = await gGet(`/drives/${mDriveId}/items/${mItemId}/workbook/worksheets('社員マスタ')/usedRange`);
+  // 列: A=社員ID, B=氏名, C=グループ, D=シフト（例: "7:30-16:00"、空欄=通常勤務）
   return (rng.values||[]).slice(1).filter(r=>r[0]&&r[1])
-    .map(r=>({ id:String(r[0]).trim().padStart(4,'0'), name:String(r[1]).trim(), group:r[2]?String(r[2]).trim():'' }));
+    .map(r=>({
+      id:    String(r[0]).trim().padStart(4,'0'),
+      name:  String(r[1]).trim(),
+      group: r[2] ? String(r[2]).trim() : '',
+      shift: r[3] ? String(r[3]).trim() : '', // "7:30-16:00" 形式、空欄=デフォルト勤務
+    }));
 }
 
 // シートキャッシュ: { 'YYYY-MM': { 'YYYY-MM-DD': { empId:[{type,time}] } } }
@@ -649,23 +662,37 @@ function m2hm(min) {
   return `${s}${Math.floor(a/60)}:${String(a%60).padStart(2,'0')}`;
 }
 
-function calcDay(logs) {
+function calcDay(logs, emp) {
   if (!logs||!logs.length) return null;
   const ci = logs.find(l=>l.type==='出勤');
   const co = [...logs].reverse().find(l=>l.type==='退勤');
   if (!ci) return null;
   const inM=t2m(ci.time), outM=co?t2m(co.time):null;
 
-  const workSt = t2m(MC.workStart ||'08:30');  // 定時始業 510
-  const workEn = t2m(MC.workEnd   ||'17:00');  // 定時終業 1020
-  const bs     = t2m(MC.breakStart||'12:00');  // 休憩開始 720
-  const be     = t2m(MC.breakEnd  ||'12:45');  // 休憩終了 765
+  // ── 勤務時間設定（シフトがある社員はシフト時間を適用） ──
+  let workSt = t2m(MC.workStart ||'08:30');
+  let workEn = t2m(MC.workEnd   ||'17:00');
+  let bs     = t2m(MC.breakStart||'12:00');
+  let be     = t2m(MC.breakEnd  ||'12:45');
+  let baseEarlyOtCutoff = t2m(MC.earlyOtCutoff||'07:15');
+
+  if (emp && emp.shift && emp.shift.includes('-')) {
+    const parts = emp.shift.split('-');
+    const ss = t2m(parts[0].trim()), se = t2m(parts[1].trim());
+    if (!isNaN(ss) && !isNaN(se) && ss >= 0 && se >= 0) {
+      const offset = ss - workSt; // 例) 7:30-8:30 = -60分
+      baseEarlyOtCutoff += offset; // 早出認定ラインもシフト
+      bs += offset;                // 休憩もシフト
+      be += offset;
+      workSt = ss;
+      workEn = se;
+    }
+  }
 
   // ── 早出残業 ──
-  // 打刻 < 7:15:00  → 打刻〜8:15 を15分刻み切り捨て（例: 7:10打刻 → 65分 → 60分）
-  // 打刻 7:15〜8:29 → 0分（早出としない）
-  const earlyOtCutoff = t2m(MC.earlyOtCutoff||'07:15'); // この時刻以降は早出なし
-  const earlyOtEnd    = workSt - 15;                     // 8:15（早出カウント終点）
+  // 打刻 < earlyOtCutoff → 打刻〜(workSt-15) を15分刻み切り捨て
+  const earlyOtCutoff = baseEarlyOtCutoff;
+  const earlyOtEnd    = workSt - 15;
   let earlyM = 0;
   if (inM < earlyOtCutoff) {
     earlyM = Math.floor((earlyOtEnd - inM) / 15) * 15;
@@ -715,11 +742,13 @@ function calcDay(logs) {
 }
 
 function aggPeriod(empId, start, end) {
+  // シフト情報を社員マスタから取得（シフト勤務対応）
+  const emp = (typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
   let days=0, workM=0, otM=0, earlyM=0, lateM=0, lateArrM=0, earlyLeaveM=0;
   let d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
   while (d<=ed) {
     const ds=d.toLocaleDateString('sv');
-    const logs=dayRecs(ds,empId), st=calcDay(logs);
+    const logs=dayRecs(ds,empId), st=calcDay(logs, emp);
     if (st&&st.workM!==null){
       days++; workM+=st.workM; otM+=st.otM||0;
       earlyM+=st.earlyM||0; lateM+=st.lateM||0;
@@ -795,8 +824,7 @@ function naturalDayState(ds) {
   const dow=new Date(ds+'T00:00:00').getDay();
   if (dow===0) return 'sunday';
   if (dow===6) return 'saturday';
-  if (jpHolidays[ds]) return 'holiday';
-  return 'workday';
+  return 'workday'; // 祝日はデフォルト出勤（jpHolidays は表示ラベルのみ）
 }
 // 会社カレンダー上の日付の状態
 function calDayState(ds) {
@@ -804,10 +832,13 @@ function calDayState(ds) {
   if(e) return e.type;
   return naturalDayState(ds);
 }
-// その日は非出勤日か
+// その日は会社休日か（出勤不要な日）
 function isHolidayDate(ds) {
   const s=calDayState(ds);
-  return s==='sunday'||s==='saturday'||s==='holiday'||s==='休日'||s==='祝日';
+  // 旧値（'休日'/'特別'/'holiday'/'祝日'）も後方互換で含める
+  return s==='sunday'||s==='saturday'
+       ||s==='臨時休業'||s==='計画有休'
+       ||s==='休日'||s==='特別'||s==='holiday'||s==='祝日';
 }
 // YYYY-MM-DD 配列を生成（月の全日）
 function monthDates(y,m) {
@@ -995,21 +1026,25 @@ async function renderDashboard() {
   document.getElementById('d-ot-total').textContent=m2hm(totalOt);
   document.getElementById('d-ot-sub').textContent=`平均 ${m2hm(Math.round(totalOt/employees.length))} / 人`;
 
-  // ── 出勤人数（直近3日間）: 日ごとに 全員の出勤時間合計 ÷ 7.75h ──
+  // ── 出勤人数（直近稼働3日）: 会社休みを除いた直近3営業日 ──
   const days3 = [];
-  for (let i=0; i<=2; i++) {
-    const dx=new Date(); dx.setDate(dx.getDate()-i);
-    days3.push(dx.toLocaleDateString('sv'));
+  { const dxCheck=new Date();
+    for(let attempts=0; attempts<60 && days3.length<3; attempts++){
+      const ds=dxCheck.toLocaleDateString('sv');
+      if(!isHolidayDate(ds)) days3.push(ds);
+      dxCheck.setDate(dxCheck.getDate()-1);
+    }
   }
   const d3months = [...new Set(days3.map(d=>d.slice(0,7)))];
   await ensureSheets(d3months);
   const hcRows = days3.map(ds => {
     const totalM = employees.reduce((sum, emp) => {
-      const st = calcDay(dayRecs(ds, emp.id));
+      const st = calcDay(dayRecs(ds, emp.id), emp);
       return sum + (st && st.workM !== null ? st.workM : 0);
     }, 0);
     const hc = (totalM / (7.75 * 60)).toFixed(2);
-    const label = ds.slice(5).replace('-','/');
+    const dow=['日','月','火','水','木','金','土'][new Date(ds+'T00:00:00').getDay()];
+    const label = ds.slice(5).replace('-','/') + `(${dow})`;
     return `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;border-bottom:1px solid #21262d">
       <span style="font-size:12px;color:#8b949e">${label}</span>
       <span style="font-size:20px;font-weight:700;color:#3fb950;font-variant-numeric:tabular-nums">${hc}<span style="font-size:11px;color:#8b949e;margin-left:2px">人</span></span>
@@ -1219,6 +1254,7 @@ async function renderOvertimePage() {
       <td style="color:#8b949e;font-size:11px">${e.id}</td>
       <td><strong>${e.name}</strong></td>
       <td><span class="gbadge">${e.group||'—'}</span></td>
+      <td style="color:#a78bfa;font-size:11px">${e.shift||'—'}</td>
       <td class="r">${e.days}日</td>
       <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
       <td class="r" style="color:#58a6ff">${e.earlyM>0?m2hm(e.earlyM):'—'}</td>
@@ -1299,7 +1335,7 @@ async function renderIndividualPage() {
 
   let html=`
   <div class="card-row cols-4" style="margin-bottom:18px">
-    <div class="card"><h3>${emp.name}（${emp.group||'—'}）</h3><div class="card-val c-blue">${empId}</div></div>
+    <div class="card"><h3>${emp.name}（${emp.group||'—'}）</h3><div class="card-val c-blue">${empId}</div><div class="card-sub">${emp.shift?`🕐 シフト: ${emp.shift}`:'通常勤務'}</div></div>
     <div class="card"><h3>年間出勤日数</h3><div class="card-val">${totDays}日</div></div>
     <div class="card"><h3>年間実働時間</h3><div class="card-val">${totWork>0?m2hm(totWork):'—'}</div></div>
     <div class="card"><h3>年間残業時間</h3><div class="card-val c-yellow">${totOt>0?m2hm(totOt):'—'}</div></div>
@@ -1379,13 +1415,14 @@ function changeCalNav(d){
 function changeCalMonth(d){ changeCalNav(d); }
 
 // ---- オフ日の日付カラーを判定 ----
-function offDayNumCls(state,nat){
-  // 会社が休みの日 → off-day(赤), 特別 → 特別色
-  if(state==='holiday'||state==='祝日') return 'kal-num off-day';
-  if(state==='sunday'||state==='saturday') return 'kal-num off-day';
-  if(state==='休日') return 'kal-num off-day';
-  if(state==='特別') return 'kal-num'; // 特別は背景色で区別
-  // 通常(休日overrideあり)は白
+function offDayNumCls(state){
+  // 土日・会社休日 → off-day(赤)
+  if(state==='sunday'||state==='saturday'
+    ||state==='臨時休業'||state==='計画有休'
+    ||state==='休日'||state==='holiday'||state==='祝日') return 'kal-num off-day';
+  // 特別(旧互換)も赤系
+  if(state==='特別') return 'kal-num off-day';
+  // 出勤日(祝日含む通常)は白
   return 'kal-num';
 }
 
@@ -1409,14 +1446,19 @@ function renderCalendarMonth(){
     const jpName=jpHolidays[ds]||'';
     const isToday=ds===today;
     let cls='kal-cell', sub='';
-    const numCls=offDayNumCls(state,nat);
-    if(state==='sunday'||state==='saturday'||(state==='休日'&&(nat==='saturday'||nat==='sunday'))){ cls+=' kal-off'; }
+    const numCls=offDayNumCls(state);
+    const jpLabel=jpHolidays[ds]?`<div class="kal-sub" style="color:#ff9050;font-size:8px">${jpHolidays[ds]}</div>`:'';
+    if(state==='sunday'||state==='saturday'||(( state==='休日')&&(nat==='saturday'||nat==='sunday'))){ cls+=' kal-off'; sub=jpLabel; }
+    else if(state==='臨時休業'){ cls+=' kal-rinkyuu'; sub=`<div class="kal-sub" style="color:#ff8080">臨時休業</div>${jpLabel}`; }
+    else if(state==='計画有休'){ cls+=' kal-keikaku'; sub=`<div class="kal-sub" style="color:#90d090">計画有休</div>${jpLabel}`; }
+    // 旧互換
     else if(state==='休日'){ cls+=' kal-off'; sub='<div class="kal-sub">休日</div>'; }
-    else if(state==='holiday'||state==='祝日'){ cls+=' kal-holiday-jp'; sub=`<div class="kal-sub" style="color:#ff6b81">${jpName||'祝日'}</div>`; }
+    else if(state==='holiday'||state==='祝日'){ cls+=' kal-holiday-jp'; sub=`<div class="kal-sub" style="color:#ff6b81">${jpHolidays[ds]||'祝日'}</div>`; }
     else if(state==='特別'){ cls+=' kal-tokubetsu'; sub='<div class="kal-sub" style="color:#a78bfa">特別</div>'; }
-    else if(state==='通常'&&(nat==='saturday'||nat==='sunday')){ sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
-    else if(state==='通常'&&nat==='holiday'){ sub='<div class="kal-sub" style="color:#3fb950">出勤</div>'; }
-    if(jpName&&state!=='holiday'&&state!=='祝日') sub+=`<div class="kal-sub" style="color:#ff6b81;font-size:8px">${jpName}</div>`;
+    // 出勤日：祝日名のみ表示（橙）
+    else{ sub=jpLabel; }
+    // 土日を通常（出勤）にした場合
+    if(state==='通常'&&(nat==='saturday'||nat==='sunday')){ cls='kal-cell'; sub=`<div class="kal-sub" style="color:#3fb950">出勤</div>${jpLabel}`; }
     if(isToday) cls+=' kal-today';
     html+=`<div class="${cls}" onclick="toggleCalDay('${ds}')"><div class="${numCls}">${d}</div>${sub}</div>`;
   }
@@ -1446,8 +1488,10 @@ function renderCalendarYear(){
       const isToday=ds===today;
       let cls='kal-mini-cell';
       if(state==='sunday'||state==='saturday'||state==='休日') cls+=' mn-off';
-      else if(state==='holiday'||state==='祝日') cls+=' mn-hol';
-      else if(state==='特別') cls+=' mn-sp';
+      else if(state==='臨時休業') cls+=' mn-rin';
+      else if(state==='計画有休') cls+=' mn-kei';
+      else if(state==='holiday'||state==='祝日') cls+=' mn-hol'; // 旧互換
+      else if(state==='特別') cls+=' mn-sp'; // 旧互換
       else cls+=' mn-work';
       if(isToday) cls+=' mn-today';
       html+=`<div class="${cls}" onclick="calMonth=${m};calYear=${calYear};calWeekDate='${ds}';changeCalView('month')" title="${ds}">${d}</div>`;
@@ -1487,26 +1531,28 @@ function renderCalendarWeek(){
       cls+=' wk-off'; numColor='#f85149';
       const lbl=nat==='saturday'?'土曜':nat==='sunday'?'日曜':'週末';
       stateBadge=`<span class="wk-state" style="background:#1e2730;color:#6e7681">${lbl}</span>`;
-    } else if(state==='休日'){
+    } else if(state==='臨時休業'){
+      cls+=' wk-rin'; numColor='#ff8080';
+      stateBadge=`<span class="wk-state" style="background:#2a1010;color:#ff8080">臨時休業</span>`;
+    } else if(state==='計画有休'){
+      cls+=' wk-kei'; numColor='#f85149';
+      stateBadge=`<span class="wk-state" style="background:#1a2a10;color:#90d090">計画有休</span>`;
+    } else if(state==='休日'){ // 旧互換
       cls+=' wk-off'; numColor='#f85149';
       stateBadge=`<span class="wk-state" style="background:#1e2730;color:#f85149">休日</span>`;
-    } else if(state==='holiday'||state==='祝日'){
-      cls+=' wk-hol'; numColor='#ff6b81';
-      stateBadge=`<span class="wk-state" style="background:#2a1520;color:#ff6b81">${jpName||'祝日'}</span>`;
-    } else if(state==='特別'){
+    } else if(state==='特別'){ // 旧互換
       cls+=' wk-sp'; numColor='#f85149';
       stateBadge=`<span class="wk-state" style="background:#1a1a3a;color:#a78bfa">特別</span>`;
     } else if(state==='通常'&&(nat==='saturday'||nat==='sunday')){
       numColor='#e6edf3';
       stateBadge=`<span class="wk-state" style="background:#1a3a2a;color:#3fb950">出勤（振替）</span>`;
-    } else if(state==='通常'&&nat==='holiday'){
-      numColor='#e6edf3';
-      stateBadge=`<span class="wk-state" style="background:#1a3a2a;color:#3fb950">出勤（祝）</span>`;
     } else {
+      // 通常出勤（平日・祝日デフォルト含む）
       numColor='#e6edf3';
-      stateBadge=`<span class="wk-state" style="background:#1c2128;color:#3fb950">通常</span>`;
+      stateBadge=`<span class="wk-state" style="background:#1c2128;color:#3fb950">出勤</span>`;
     }
-    const jpExtra=jpName&&state!=='holiday'&&state!=='祝日'?`<div class="wk-jp">${jpName}</div>`:'';
+    // 祝日名は常に表示
+    const jpExtra=jpName?`<div class="wk-jp">${jpName}</div>`:'';
     if(isToday) cls+=' kal-today';
     html+=`<div class="${cls}" onclick="toggleCalDay('${ds}')">
       <div class="wk-dow" style="color:${dow===0?'#f85149':dow===6?'#58a6ff':'#8b949e'}">${DOWS[dow]}</div>
@@ -1534,22 +1580,23 @@ async function toggleCalDay(ds) {
   const nat=naturalDayState(ds);
   const stored=KC.calendar.find(e=>e.date===ds);
   const cur=stored?stored.type:nat;
-  // Cycle: workday→休日→特別→通常(remove); weekend→通常(override)→null(remove); holiday→通常→null
+  // サイクル:
+  //   平日（祝日含む） 出勤(workday) → 臨時休業 → 計画有休 → 出勤(null)
+  //   土曜/日曜       休日(default) ↔ 通常(出勤追加) ↔ 休日(null)
   let next=null;
   if(nat==='saturday'||nat==='sunday') {
-    next=(cur==='saturday'||cur==='sunday'||cur==='休日')?'通常':null;
-  } else if(nat==='holiday') {
-    next=(cur==='holiday'||cur==='祝日')?'通常':null;
+    next=(cur==='saturday'||cur==='sunday'||cur==='休日'||cur==='計画有休'||cur==='臨時休業')?'通常':null;
   } else {
-    if(cur==='workday'||cur==='通常') next='休日';
-    else if(cur==='休日') next='特別';
-    else if(cur==='特別') next=null;
-    else next='休日';
+    // 平日（祝日も出勤デフォルト）
+    if(cur==='workday'||cur==='通常'||cur==='holiday') next='臨時休業';
+    else if(cur==='臨時休業'||cur==='休日') next='計画有休';
+    else if(cur==='計画有休'||cur==='特別') next=null;
+    else next='臨時休業';
   }
   KC.calendar=KC.calendar.filter(e=>e.date!==ds);
   if(next!==null) KC.calendar.push({date:ds,type:next,memo:''});
-  try{ await saveKSheet('会社カレンダー',KC.calendar.map(e=>[e.date,e.type,e.memo])); }
-  catch(ex){ console.error(ex); }
+  try{ await saveKSheet('会社カレンダー',KC.calendar.map(e=>[e.date,e.type,e.memo])); toast('📅 カレンダーを保存しました'); }
+  catch(ex){ console.error(ex); toast('⚠️ 保存失敗: '+ex.message,'#e74c3c'); }
   renderCalendarPage();
 }
 
@@ -1611,8 +1658,9 @@ function renderLpContent(empId){
       else if(leave.type==='半休PM') { cls+=' kal-hankyu-pm'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#102a18;color:#238636">半休PM</span></div>'; }
     }
     const jpName=jpHolidays[ds]||'';
-    if(nonWork&&jpName) sub=`<div class="kal-sub" style="color:#ff6b81;font-size:8px">${jpName}</div>`;
-    if(dow===0&&!nonWork) numCls+=' sun'; else if(dow===6&&!nonWork) numCls+=' sat';
+    if(jpName&&!leave) sub+=`<div class="kal-sub" style="color:#ff9050;font-size:8px">${jpName}</div>`;
+    if(nonWork) numCls+=' off-day'; // 休日は赤
+    else if(dow===0) numCls+=' sun'; else if(dow===6) numCls+=' sat';
     if(isToday) cls+=' kal-today';
     const clickFn=nonWork?'':`onclick="toggleLeaveDay('${empId}','${ds}')"`;
     calHtml+=`<div class="${cls}" ${clickFn}><div class="${numCls}">${d}</div>${sub}</div>`;
