@@ -181,6 +181,7 @@
     .kal-cell.kal-yuukyu{background:#1a3a2a}
     .kal-cell.kal-hankyu-am{background:#163022}
     .kal-cell.kal-hankyu-pm{background:#122820}
+    .kal-cell.kal-jikan-leave{background:#1a2545}
     .kal-cell.kal-disabled{cursor:default;opacity:.6}
     .kal-cell.kal-disabled:hover{border-color:#30363d !important}
     .kal-num{font-size:13px;font-weight:600;color:#e6edf3}
@@ -1815,64 +1816,219 @@ function renderLeavePlanPage(){
   renderLpContent(empId);
 }
 
+// ── 有休ヘルパー ────────────────────────────────────────────────
+function leaveBgCls(type){
+  if(!type) return '';
+  if(type==='1日'||type==='有休') return 'kal-yuukyu';
+  if(type==='半休AM') return 'kal-hankyu-am';
+  if(type==='半休PM') return 'kal-hankyu-pm';
+  if(type.startsWith('時間:')) return 'kal-jikan-leave';
+  return 'kal-yuukyu';
+}
+function leaveTypeLabel(type){
+  if(!type) return '—';
+  if(type==='1日'||type==='有休') return '1日';
+  if(type==='半休AM') return '半日（午前）';
+  if(type==='半休PM') return '半日（午後）';
+  if(type.startsWith('時間:')){
+    const p=type.slice(3);
+    const [s,e]=p.split('-').map(Number);
+    return `時間 ${String(s).padStart(2,'0')}:00〜${String(e).padStart(2,'0')}:00（${e-s}h）`;
+  }
+  return type;
+}
+function leaveHoursVal(type){
+  if(!type) return 0;
+  const mc2=loadMainCfg();
+  const totalM=t2m(mc2.workEnd||'17:00')-t2m(mc2.workStart||'08:30')-(t2m(mc2.breakEnd||'12:45')-t2m(mc2.breakStart||'12:00'));
+  const dayH=totalM/60;
+  if(type==='1日'||type==='有休') return dayH;
+  if(type==='半休AM'||type==='半休PM') return dayH/2;
+  if(type.startsWith('時間:')){
+    const [s,e]=type.slice(3).split('-').map(Number);
+    return e-s;
+  }
+  return 0;
+}
+function leaveBadgeHtml(type){
+  if(!type) return '';
+  const label=leaveTypeLabel(type);
+  if(type==='1日'||type==='有休') return `<span class="kal-badge" style="background:#1a5a3a;color:#3fb950">${label}</span>`;
+  if(type==='半休AM') return `<span class="kal-badge" style="background:#153a22;color:#2ea043">${label}</span>`;
+  if(type==='半休PM') return `<span class="kal-badge" style="background:#102a18;color:#238636">${label}</span>`;
+  if(type.startsWith('時間:')) return `<span class="kal-badge" style="background:#1a2545;color:#79c0ff">${label}</span>`;
+  return `<span class="kal-badge" style="background:#2a2a3a;color:#e6edf3">${type}</span>`;
+}
+function lpLvTypeChange(){
+  const v=document.querySelector('input[name="lv-type"]:checked')?.value;
+  document.getElementById('lp-lv-time-row').style.display=(v==='時間')?'block':'none';
+}
+
 function renderLpContent(empId){
   if(!empId){empId=document.getElementById('lp-sel').value;}
   const today=new Date().toLocaleDateString('sv');
+  const ym=`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`;
   const firstDow=new Date(lpCalYear,lpCalMonth-1,1).getDay();
   const lastDate=new Date(lpCalYear,lpCalMonth,0).getDate();
   const DOWS=['日','月','火','水','木','金','土'];
-  const leaveMap={};
-  KC.leaves.filter(l=>l.id===empId&&l.date.slice(0,7)===`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`).forEach(l=>{leaveMap[l.date]=l;});
-  const plans=[...KC.otPlans].filter(l=>l.id===empId&&l.date.slice(0,7)===`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`).sort((a,b)=>a.date.localeCompare(b.date));
+  const mc=loadMainCfg();
 
+  // ── Build maps ──
+  const leaveMap={};
+  KC.leaves.filter(l=>l.id===empId&&l.date.startsWith(ym)).forEach(l=>{leaveMap[l.date]=l;});
+  const planMap={};
+  KC.otPlans.filter(l=>l.id===empId&&l.date.startsWith(ym)).forEach(l=>{planMap[l.date]=l;});
+
+  // ── Calendar (display-only) ──
   let calHtml='<div class="kal-grid">';
   DOWS.forEach((d,i)=>{ calHtml+=`<div class="kal-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#8b949e'}">${d}</div>`; });
   for(let i=0;i<firstDow;i++) calHtml+='<div class="kal-cell kal-empty"></div>';
   for(let d=1;d<=lastDate;d++){
-    const ds=`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const ds=`${ym}-${String(d).padStart(2,'0')}`;
     const isToday=ds===today;
     const dow=new Date(ds+'T00:00:00').getDay();
     const nonWork=isHolidayDate(ds);
     const leave=leaveMap[ds];
-    let cls='kal-cell', numCls='kal-num', sub='';
-    if(nonWork){ cls+=' kal-off kal-disabled'; }
-    else if(leave){
-      if(leave.type==='有休') { cls+=' kal-yuukyu'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#1a5a3a;color:#3fb950">有休</span></div>'; }
-      else if(leave.type==='半休AM') { cls+=' kal-hankyu-am'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#153a22;color:#2ea043">半休AM</span></div>'; }
-      else if(leave.type==='半休PM') { cls+=' kal-hankyu-pm'; sub='<div class="kal-sub"><span class="kal-badge" style="background:#102a18;color:#238636">半休PM</span></div>'; }
-    }
-    const jpName=jpHolidays[ds]||'';
-    if(jpName&&!leave) sub+=`<div class="kal-sub" style="color:#ff9050;font-size:8px">${jpName}</div>`;
-    if(nonWork) numCls+=' off-day'; // 休日は赤
-    else if(dow===0) numCls+=' sun'; else if(dow===6) numCls+=' sat';
+    const plan=planMap[ds];
+    let cls='kal-cell kal-disabled';
+    if(nonWork) cls+=' kal-off';
+    else if(leave) cls+=' '+leaveBgCls(leave.type);
     if(isToday) cls+=' kal-today';
-    const clickFn=nonWork?'':`onclick="toggleLeaveDay('${empId}','${ds}')"`;
-    calHtml+=`<div class="${cls}" ${clickFn}><div class="${numCls}">${d}</div>${sub}</div>`;
+    let numCls='kal-num';
+    if(nonWork) numCls+=' off-day';
+    else if(dow===0) numCls+=' sun';
+    else if(dow===6) numCls+=' sat';
+    const jpName=jpHolidays[ds]||'';
+    let sub='';
+    if(leave) sub+=`<div class="kal-sub">${leaveBadgeHtml(leave.type)}</div>`;
+    else if(jpName) sub+=`<div class="kal-sub" style="color:#ff9050;font-size:8px;overflow:hidden;text-overflow:ellipsis">${jpName}</div>`;
+    if(plan) sub+=`<div class="kal-sub"><span style="font-size:8px;color:#d29922">残業${plan.hours}h予定</span></div>`;
+    calHtml+=`<div class="${cls}" style="cursor:default"><div class="${numCls}">${d}</div>${sub}</div>`;
   }
   calHtml+='</div>';
 
-  const planRows=plans.length?plans.map(l=>`<tr><td>${l.date}</td><td class="r" style="color:#d29922">${l.hours}h</td><td style="color:#8b949e">${l.memo||'—'}</td><td><button onclick="deleteOtPlan('${empId}','',  '${l.date}')" style="background:none;border:none;color:#f85149;cursor:pointer">🗑</button></td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>';
+  // ── 有休テーブル ──
+  const leaveList=Object.values(leaveMap).sort((a,b)=>a.date.localeCompare(b.date));
+  const leaveRows=leaveList.length
+    ?leaveList.map(l=>`<tr>
+      <td>${l.date}</td>
+      <td>${leaveBadgeHtml(l.type)}</td>
+      <td class="r" style="color:#3fb950">${leaveHoursVal(l.type).toFixed(1)}h</td>
+      <td style="color:#8b949e;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${l.memo||'—'}</td>
+      <td><button onclick="deleteLeave('${empId}','${l.date}')" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:14px">🗑</button></td>
+    </tr>`).join('')
+    :'<tr><td colspan="5" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>';
+
+  // ── 残業予定テーブル（実績列付き）──
+  const emp=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
+  const plans=[...KC.otPlans].filter(l=>l.id===empId&&l.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));
+  const planRows=plans.length
+    ?plans.map(l=>{
+      let actualStr='<span style="color:#6e7681">—</span>';
+      try{
+        const logs=dayRecs(l.date, empId);
+        if(logs&&logs.length){
+          const st=calcDay(logs, emp);
+          if(st&&st.otM!=null) actualStr=`<span style="color:#3fb950">${(st.otM/60).toFixed(2)}h</span>`;
+        }
+      }catch(e2){}
+      return `<tr>
+        <td>${l.date}</td>
+        <td class="r" style="color:#d29922">${l.hours}h</td>
+        <td class="r">${actualStr}</td>
+        <td style="color:#8b949e;font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${l.memo||'—'}</td>
+        <td><button onclick="deleteOtPlan('${empId}','','${l.date}')" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:14px">🗑</button></td>
+      </tr>`;
+    }).join('')
+    :'<tr><td colspan="5" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>';
+
+  // ── 時間単位セレクト生成 ──
+  const wsH=parseInt((mc.workStart||'08:30').split(':')[0]);
+  const weH=parseInt((mc.workEnd||'17:00').split(':')[0]);
+  let timeOpts='';
+  for(let h=wsH;h<=weH;h++) timeOpts+=`<option value="${h}">${String(h).padStart(2,'0')}:00</option>`;
+  const enTimeOpts=timeOpts; // same range for end
 
   document.getElementById('lp-content').innerHTML=`
-    <div class="card-row cols-2">
-      <div class="kal-wrap">
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+      <!-- カレンダー（表示のみ） -->
+      <div class="kal-wrap" style="flex-shrink:0;min-width:280px">
         <div class="kal-legend">
-          <span><span class="kal-legend-dot" style="background:#1a3a2a"></span>有休</span>
+          <span><span class="kal-legend-dot" style="background:#1a3a2a"></span>1日</span>
           <span><span class="kal-legend-dot" style="background:#163022"></span>半休AM</span>
           <span><span class="kal-legend-dot" style="background:#122820"></span>半休PM</span>
+          <span><span class="kal-legend-dot" style="background:#1a2545"></span>時間</span>
           <span><span class="kal-legend-dot" style="background:#1a1f27"></span>休日</span>
-          <span style="margin-left:auto;font-size:10px;color:#6e7681">クリックで切替</span>
         </div>
         ${calHtml}
       </div>
-      <div class="tbl-card">
-        <div class="tbl-hdr"><h3>📋 残業予定</h3><button class="btn-export" onclick="openAddOtPlanDirect('${empId}')">＋ 追加</button></div>
-        <table class="tbl"><thead><tr><th>日付</th><th>予定時間</th><th>メモ</th><th></th></tr></thead>
-        <tbody>${planRows}</tbody></table>
+      <!-- テーブル群 -->
+      <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:12px">
+        <div class="tbl-card">
+          <div class="tbl-hdr">
+            <h3>🌴 有休一覧</h3>
+            <button class="btn-export" onclick="openAddLeave('${empId}')">＋ 追加</button>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>日付</th><th>種別</th><th>時間</th><th>メモ</th><th></th></tr></thead>
+            <tbody>${leaveRows}</tbody>
+          </table>
+        </div>
+        <div class="tbl-card">
+          <div class="tbl-hdr">
+            <h3>📋 残業予定</h3>
+            <button class="btn-export" onclick="openAddOtPlanDirect('${empId}')">＋ 追加</button>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>日付</th><th>予定(h)</th><th>実績(h)</th><th>メモ</th><th></th></tr></thead>
+            <tbody>${planRows}</tbody>
+          </table>
+        </div>
       </div>
     </div>
-    <div id="lp-plan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:360px">
+
+    <!-- 有休登録モーダル -->
+    <div id="lp-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:380px;max-width:95vw">
+        <h3 style="margin-bottom:16px">🌴 有休登録</h3>
+        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
+        <input type="date" id="lp-lv-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:12px">
+        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:8px">種別</label>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+            <input type="radio" name="lv-type" value="1日" checked onchange="lpLvTypeChange()"><span>1日</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+            <input type="radio" name="lv-type" value="半休AM" onchange="lpLvTypeChange()"><span>半日（午前）</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+            <input type="radio" name="lv-type" value="半休PM" onchange="lpLvTypeChange()"><span>半日（午後）</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+            <input type="radio" name="lv-type" value="時間" onchange="lpLvTypeChange()"><span>時間単位</span>
+          </label>
+        </div>
+        <div id="lp-lv-time-row" style="display:none;margin-bottom:12px;background:#0d1117;border-radius:8px;padding:10px">
+          <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:6px">時間帯（1時間単位）</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="lp-lv-st" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1">${timeOpts}</select>
+            <span style="color:#8b949e;font-weight:700">〜</span>
+            <select id="lp-lv-en" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1">${enTimeOpts}</select>
+          </div>
+          <div id="lp-lv-hours-preview" style="font-size:11px;color:#79c0ff;margin-top:6px;text-align:center"></div>
+        </div>
+        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ（任意）</label>
+        <input type="text" id="lp-lv-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px" placeholder="">
+        <div style="display:flex;gap:8px">
+          <button onclick="saveLeave()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
+          <button onclick="document.getElementById('lp-leave-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 残業予定登録モーダル -->
+    <div id="lp-plan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:360px;max-width:95vw">
         <h3 style="margin-bottom:16px">📋 残業予定登録</h3>
         <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
         <input type="date" id="lp-plan-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
@@ -1886,20 +2042,68 @@ function renderLpContent(empId){
         </div>
       </div>
     </div>`;
+
+  // Set up time preview update
+  const stEl=document.getElementById('lp-lv-st');
+  const enEl=document.getElementById('lp-lv-en');
+  if(stEl&&enEl){
+    const updatePreview=()=>{
+      const s=parseInt(stEl.value)||wsH;
+      const e=parseInt(enEl.value)||(wsH+1);
+      const el=document.getElementById('lp-lv-hours-preview');
+      if(!el)return;
+      if(e>s) el.textContent=`→ ${e-s}時間の有休`;
+      else el.textContent='⚠ 終了時刻は開始より後にしてください';
+    };
+    stEl.addEventListener('change',updatePreview);
+    enEl.addEventListener('change',updatePreview);
+    // Set default end = start + 1
+    if(enEl.options.length>1) enEl.value=wsH+1;
+  }
 }
-async function toggleLeaveDay(empId, ds){
-  const ym=ds.slice(0,7);
-  const existing=KC.leaves.find(l=>l.id===empId&&l.date===ds);
-  const cur=existing?existing.type:null;
-  let next=null;
-  if(!cur) next='有休';
-  else if(cur==='有休') next='半休AM';
-  else if(cur==='半休AM') next='半休PM';
-  else next=null; // remove
-  KC.leaves=KC.leaves.filter(l=>!(l.id===empId&&l.date===ds));
-  if(next) KC.leaves.push({id:empId,ym,date:ds,type:next,memo:''});
-  try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🌴 有休を更新しました'); }
+
+function openAddLeave(empId, ds=''){
+  _lpCurEmpId=empId;
+  const d=ds||new Date().toLocaleDateString('sv');
+  document.getElementById('lp-lv-date').value=d;
+  document.querySelectorAll('input[name="lv-type"]').forEach(r=>{r.checked=(r.value==='1日');});
+  document.getElementById('lp-lv-time-row').style.display='none';
+  document.getElementById('lp-lv-memo').value='';
+  const mc=loadMainCfg();
+  const wsH=parseInt((mc.workStart||'08:30').split(':')[0]);
+  const stEl=document.getElementById('lp-lv-st');
+  const enEl=document.getElementById('lp-lv-en');
+  if(stEl) stEl.value=wsH;
+  if(enEl) enEl.value=wsH+1;
+  document.getElementById('lp-leave-modal').style.display='flex';
+}
+
+async function saveLeave(){
+  const date=document.getElementById('lp-lv-date').value;
+  const typeVal=document.querySelector('input[name="lv-type"]:checked')?.value||'1日';
+  const memo=document.getElementById('lp-lv-memo').value.trim();
+  if(!date){alert('日付を入力してください');return;}
+  let type=typeVal;
+  if(typeVal==='時間'){
+    const st=parseInt(document.getElementById('lp-lv-st').value);
+    const en=parseInt(document.getElementById('lp-lv-en').value);
+    if(en<=st){alert('終了時刻は開始時刻より後にしてください');return;}
+    type=`時間:${String(st).padStart(2,'0')}-${String(en).padStart(2,'0')}`;
+  }
+  const ym=date.slice(0,7);
+  KC.leaves=KC.leaves.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
+  KC.leaves.push({id:_lpCurEmpId,ym,date,type,memo});
+  document.getElementById('lp-leave-modal').style.display='none';
+  try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🌴 有休を登録しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
+  renderLpContent(_lpCurEmpId);
+}
+
+async function deleteLeave(empId, date){
+  if(!confirm(`${date} の有休を削除しますか？`))return;
+  KC.leaves=KC.leaves.filter(l=>!(l.id===empId&&l.date===date));
+  try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🗑 削除しました'); }
+  catch(e){ alert('削除エラー: '+e.message); }
   renderLpContent(empId);
 }
 
@@ -1907,6 +2111,7 @@ function openAddOtPlanDirect(empId){
   _lpCurEmpId=empId;
   _lpCurYm=`${lpCalYear}-${String(lpCalMonth).padStart(2,'0')}`;
   document.getElementById('lp-plan-date').value=new Date().toLocaleDateString('sv');
+  document.getElementById('lp-plan-hours').value='1';
   document.getElementById('lp-plan-memo').value='';
   document.getElementById('lp-plan-modal').style.display='flex';
 }
