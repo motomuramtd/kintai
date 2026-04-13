@@ -718,6 +718,11 @@ function calcDay(logs, emp) {
 
   if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null };
 
+  // ── 始業前退勤 → 欠勤扱い（体調不良等で始業時刻前に退勤した場合） ──
+  if (outM < workSt) {
+    return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM:null, otM:null, isPreworkAbsent:true };
+  }
+
   // ── 残業: (終業+15分)起点 15分刻み切り捨て ──
   // 例) 17:00終業 → 17:29:59まで残業なし、17:30〜=15分残業、17:45〜=30分…
   const otThresh = workEn + 15;   // 17:15
@@ -763,7 +768,10 @@ function aggPeriod(empId, start, end) {
       days++; workM+=st.workM; otM+=st.otM||0;
       earlyM+=st.earlyM||0; lateM+=st.lateM||0;
       lateArrM+=st.lateArrM||0; earlyLeaveM+=st.earlyLeaveM||0;
-    } else if (logs.some(r=>r.type==='出勤')) days++;
+    } else if (logs.some(r=>r.type==='出勤') && !st?.isPreworkAbsent) {
+      // 退勤未打刻は出勤日扱い。始業前退勤（体調不良等）は欠勤なのでカウントしない
+      days++;
+    }
     d.setDate(d.getDate()+1);
   }
   return { days, workM, otM, earlyM, lateM, lateArrM, earlyLeaveM };
@@ -1500,6 +1508,16 @@ async function renderIndividualPage() {
         <td style="color:${dowColor}">${dowLabel}</td>
         <td colspan="7" style="text-align:center;color:#4a5060">${hasPunch&&st?`${st.inT||'—'} → ${st.outT||'未退勤'}（出勤記録あり）`:`${offLabel}${jpN}`}</td>
         <td>${hasPunch?'<span class="tag t-warn">出勤</span>':'<span class="tag t-muted">休日</span>'}</td>
+      </tr>`;
+    } else if(st && st.isPreworkAbsent){
+      // 始業前退勤 → 欠勤（打刻時間を表示）
+      html+=`<tr style="${todaySty};background:#1e1010">
+        <td style="color:${isToday?'#58a6ff':'#f85149'}">${dateLabel}</td>
+        <td style="color:${dowColor}">${dowLabel}</td>
+        <td class="r" style="color:#8b949e">${st.inT}</td>
+        <td class="r" style="color:#8b949e">${st.outT}</td>
+        <td colspan="5" style="text-align:center;color:#f85149;font-size:11px">始業前退勤（欠勤扱い）</td>
+        <td><span class="tag t-danger">欠勤</span></td>
       </tr>`;
     } else if(!st||st.workM===null){
       // 欠勤 or 打刻なし
