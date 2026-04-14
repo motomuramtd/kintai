@@ -115,6 +115,7 @@
     .mc-in{background:linear-gradient(160deg,#154d2e,#1e7540);border-color:#27ae60}.mc-in .mini-card-accent{background:#2ecc71}.mc-in .mini-card-name{color:#fff}
     .mc-out{background:linear-gradient(160deg,#6b4200,#b87200);border-color:#e67e22}.mc-out .mini-card-accent{background:#f39c12}.mc-out .mini-card-name{color:#fff}
     .mc-done{background:linear-gradient(160deg,#2a0e0e,#4a1515);border-color:#7a2525}.mc-done .mini-card-accent{background:#c0392b}.mc-done .mini-card-name{color:#f0aaaa}
+    .mc-vac{background:linear-gradient(160deg,#2a0a40,#4a1a70);border-color:#7b3fa0}.mc-vac .mini-card-accent{background:#9b59b6}.mc-vac .mini-card-name{color:#e8c0ff}
 
     /* ===== OT progress bar ===== */
     .ot-wrap{display:flex;align-items:center;gap:8px}
@@ -365,11 +366,12 @@
           <div class="tbl-card" style="padding:14px 16px">
             <div class="tbl-hdr" style="margin-bottom:10px">
               <h3>👥 本日の出勤状況</h3>
-              <div style="display:flex;gap:12px;margin-left:auto;font-size:11px;color:#8b949e;align-items:center">
+              <div style="display:flex;gap:12px;margin-left:auto;font-size:11px;color:#8b949e;align-items:center;flex-wrap:wrap">
                 <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#27ae60;margin-right:4px;vertical-align:middle"></span>出勤中</span>
                 <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f39c12;margin-right:4px;vertical-align:middle"></span>外出中</span>
                 <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:linear-gradient(160deg,#2a0e0e,#4a1515);border:1px solid #7a2525;margin-right:4px;vertical-align:middle"></span>退勤済</span>
                 <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#555;margin-right:4px;vertical-align:middle"></span>未出勤</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:linear-gradient(160deg,#2a0a40,#4a1a70);border:1px solid #7b3fa0;margin-right:4px;vertical-align:middle"></span>休暇中</span>
               </div>
             </div>
             <div id="d-emp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px"></div>
@@ -1080,8 +1082,9 @@ async function renderDashboard() {
 
   // 今日の出勤
   const todayIn=employees.filter(e=>(todayMap[e.id]||[]).some(r=>r.type==='出勤')).length;
+  const todayVac=employees.filter(e=>(KC.vacations||[]).some(v=>v.id===e.id&&v.startDate<=today&&today<=v.endDate)).length;
   document.getElementById('d-today').textContent=`${todayIn}名`;
-  document.getElementById('d-today-sub').textContent=`全${employees.length}名中`;
+  document.getElementById('d-today-sub').textContent=`全${employees.length}名中`+(todayVac>0?` ・休暇 ${todayVac}名`:'');
 
   // 今月集計
   const stats=employees.map(emp=>({ ...emp, ...aggPeriod(emp.id,cp.start,cp.end) }));
@@ -1167,7 +1170,24 @@ function renderMiniGrid(todayMap) {
   const grid = document.getElementById('d-emp-grid');
   if (!grid) return;
   grid.innerHTML = '';
+  const todayStr = new Date().toLocaleDateString('sv');
   employees.forEach(emp => {
+    // ── 休暇中チェック（最優先） ──
+    const vac = (KC.vacations||[]).find(v=>v.id===emp.id&&v.startDate<=todayStr&&todayStr<=v.endDate);
+    if (vac) {
+      const card = document.createElement('div');
+      card.className = 'mini-card mc-vac';
+      card.innerHTML = `
+        <div class="mini-card-accent"></div>
+        <div class="mini-card-body">
+          <div class="mini-card-name">${emp.name}</div>
+          <span class="mini-card-badge">休暇中</span>
+          <div class="mini-card-time" style="color:#d0a0ff;font-size:8px">${vac.reason}</div>
+        </div>`;
+      grid.appendChild(card);
+      return;
+    }
+
     const recs = todayMap[emp.id] || [];
     const last = recs.length ? recs[recs.length-1] : null;
     let st = 'none';
@@ -1185,7 +1205,6 @@ function renderMiniGrid(todayMap) {
       const goRec = [...recs].reverse().find(r=>r.type==='外出');
       if(goRec) subInfo=`<div style="font-size:9px;color:#f39c12;margin-top:2px">外出 ${goRec.time.slice(0,5)}</div>`;
     } else if (st==='in') {
-      // 戻り済みの外出があればその回数を表示
       const outCnt = recs.filter(r=>r.type==='外出').length;
       if(outCnt>0) subInfo=`<div style="font-size:9px;color:#8b949e;margin-top:2px">外出${outCnt}回</div>`;
     }
@@ -1539,6 +1558,24 @@ async function renderIndividualPage() {
     const dowColor=dow===0?'#f85149':dow===6?'#58a6ff':'#cdd9e5';
     const dateLabel=ds.slice(5).replace('-','/');
     const todaySty=isToday?'border-left:3px solid #58a6ff':'';
+
+    // ── 休暇チェック（最優先で表示） ──
+    const vac=(KC.vacations||[]).find(v=>v.id===empId&&v.startDate<=ds&&ds<=v.endDate);
+    if(vac){
+      const RCOL={'一時帰国':'#58a6ff','病気休暇':'#f85149','育児休業':'#3fb950','産前・産後休業':'#d29922','介護休業':'#a78bfa','その他':'#8b949e'};
+      const rc=RCOL[vac.reason]||'#d0a0ff';
+      const punchNote=hasPunch&&st?`<span style="font-size:10px;color:#8b949e;margin-left:8px">出勤記録あり（${st.inT}→${st.outT||'未退勤'}）</span>`:'';
+      html+=`<tr style="background:#1a0a28;${todaySty}">
+        <td style="color:${isToday?'#58a6ff':'#c0a0ff'}">${dateLabel}</td>
+        <td style="color:${dowColor}">${dowLabel}</td>
+        <td colspan="11" style="text-align:center">
+          <span class="tag" style="background:#3a1060;color:${rc};font-size:11px;padding:2px 10px">🏖 ${vac.reason}</span>
+          ${punchNote}
+        </td>
+        <td><span class="tag" style="background:#2a1040;color:#c0a0ff">休暇</span></td>
+      </tr>`;
+      return;
+    }
 
     if(offDay){
       // 休日行
