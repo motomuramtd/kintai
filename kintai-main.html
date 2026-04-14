@@ -1320,8 +1320,8 @@ async function renderOvertimePage() {
     </tr>`;
   }).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:16px">アラートなし ✅</td></tr>';
 
-  // 全員詳細
-  const sorted=[...filteredStats].sort((a,b)=>b.otM-a.otM);
+  // 全員詳細（残業時間（時間）チャートと同じ社員ID順）
+  const sorted=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
   document.getElementById('ot-detail-tbody').innerHTML=sorted.map(e=>{
     const pct=Math.min(100,Math.round(e.otM/otLimit*100));
     const cls=e.otM>=otLimit?'danger':e.otM>=otLimit*.8?'warn':'ok';
@@ -1881,15 +1881,26 @@ function leaveBgCls(type){
   if(type.startsWith('時間:')) return 'kal-jikan-leave';
   return 'kal-yuukyu';
 }
+// 時間有休の時刻文字列を "HH:MM" 形式に正規化（旧フォーマット "09" → "09:00" に対応）
+function _lvNormTime(s){ return s&&s.includes(':')?s:`${String(s||'0').padStart(2,'0')}:00`; }
+// "時間:HH:MM-HH:MM" または旧 "時間:HH-HH" から {sStr, eStr, diffM, hours} を取り出す
+function _lvParseJikan(type){
+  const p=type.slice(3); // "08:30-09:31" or "09-12"
+  const dash=p.indexOf('-');
+  const sRaw=p.slice(0,dash), eRaw=p.slice(dash+1);
+  const sStr=_lvNormTime(sRaw), eStr=_lvNormTime(eRaw);
+  const diffM=t2m(eStr)-t2m(sStr);
+  const hours=diffM>0?Math.ceil(diffM/60):0;
+  return {sStr,eStr,diffM,hours};
+}
 function leaveTypeLabel(type){
   if(!type) return '—';
   if(type==='1日'||type==='有休') return '1日';
   if(type==='半休AM') return '半日（午前）';
   if(type==='半休PM') return '半日（午後）';
   if(type.startsWith('時間:')){
-    const p=type.slice(3);
-    const [s,e]=p.split('-').map(Number);
-    return `時間 ${String(s).padStart(2,'0')}:00〜${String(e).padStart(2,'0')}:00（${e-s}h）`;
+    const {sStr,eStr,hours}=_lvParseJikan(type);
+    return `時間 ${sStr}〜${eStr}（${hours}h）`;
   }
   return type;
 }
@@ -1901,8 +1912,7 @@ function leaveHoursVal(type){
   if(type==='1日'||type==='有休') return dayH;
   if(type==='半休AM'||type==='半休PM') return dayH/2;
   if(type.startsWith('時間:')){
-    const [s,e]=type.slice(3).split('-').map(Number);
-    return e-s;
+    return _lvParseJikan(type).hours;
   }
   return 0;
 }
@@ -2006,12 +2016,7 @@ function renderLpContent(empId){
     }).join('')
     :'<tr><td colspan="7" style="text-align:center;color:#8b949e;padding:12px">登録なし</td></tr>';
 
-  // ── 時間単位セレクト生成 ──
-  const wsH=parseInt((mc.workStart||'08:30').split(':')[0]);
-  const weH=parseInt((mc.workEnd||'17:00').split(':')[0]);
-  let timeOpts='';
-  for(let h=wsH;h<=weH;h++) timeOpts+=`<option value="${h}">${String(h).padStart(2,'0')}:00</option>`;
-  const enTimeOpts=timeOpts; // same range for end
+  // ── 時間単位: input[type=time] を使用（1分単位） ──
 
   document.getElementById('lp-content').innerHTML=`
     <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
@@ -2073,13 +2078,15 @@ function renderLpContent(empId){
           </label>
         </div>
         <div id="lp-lv-time-row" style="display:none;margin-bottom:12px;background:#0d1117;border-radius:8px;padding:10px">
-          <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:6px">時間帯（1時間単位）</label>
+          <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:6px">時間帯（1分単位で入力）</label>
           <div style="display:flex;align-items:center;gap:8px">
-            <select id="lp-lv-st" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1">${timeOpts}</select>
+            <input type="time" id="lp-lv-st" value="08:30" step="60"
+              style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
             <span style="color:#8b949e;font-weight:700">〜</span>
-            <select id="lp-lv-en" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1">${enTimeOpts}</select>
+            <input type="time" id="lp-lv-en" value="09:30" step="60"
+              style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
           </div>
-          <div id="lp-lv-hours-preview" style="font-size:11px;color:#79c0ff;margin-top:6px;text-align:center"></div>
+          <div id="lp-lv-hours-preview" style="font-size:12px;color:#79c0ff;margin-top:6px;text-align:center;font-weight:600"></div>
         </div>
         <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ（任意）</label>
         <input type="text" id="lp-lv-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px" placeholder="">
@@ -2109,22 +2116,29 @@ function renderLpContent(empId){
       </div>
     </div>`;
 
-  // Set up time preview update
+  // Set up time preview update（1分単位・切り上げ）
   const stEl=document.getElementById('lp-lv-st');
   const enEl=document.getElementById('lp-lv-en');
   if(stEl&&enEl){
     const updatePreview=()=>{
-      const s=parseInt(stEl.value)||wsH;
-      const e=parseInt(enEl.value)||(wsH+1);
+      const s=stEl.value, e=enEl.value;
       const el=document.getElementById('lp-lv-hours-preview');
       if(!el)return;
-      if(e>s) el.textContent=`→ ${e-s}時間の有休`;
-      else el.textContent='⚠ 終了時刻は開始より後にしてください';
+      if(s&&e){
+        const diffM=t2m(e)-t2m(s);
+        if(diffM>0){
+          const hours=Math.ceil(diffM/60);
+          el.textContent=`→ ${hours}時間の有休（${diffM}分間）`;
+          el.style.color='#79c0ff';
+        } else {
+          el.textContent='⚠ 終了時刻は開始より後にしてください';
+          el.style.color='#f85149';
+        }
+      }
     };
-    stEl.addEventListener('change',updatePreview);
-    enEl.addEventListener('change',updatePreview);
-    // Set default end = start + 1
-    if(enEl.options.length>1) enEl.value=wsH+1;
+    stEl.addEventListener('input',updatePreview);
+    enEl.addEventListener('input',updatePreview);
+    updatePreview(); // 初期表示
   }
 }
 
@@ -2135,12 +2149,14 @@ function openAddLeave(empId, ds=''){
   document.querySelectorAll('input[name="lv-type"]').forEach(r=>{r.checked=(r.value==='1日');});
   document.getElementById('lp-lv-time-row').style.display='none';
   document.getElementById('lp-lv-memo').value='';
-  const mc=loadMainCfg();
-  const wsH=parseInt((mc.workStart||'08:30').split(':')[0]);
+  // デフォルト 08:30〜09:30
   const stEl=document.getElementById('lp-lv-st');
   const enEl=document.getElementById('lp-lv-en');
-  if(stEl) stEl.value=wsH;
-  if(enEl) enEl.value=wsH+1;
+  if(stEl) stEl.value='08:30';
+  if(enEl) enEl.value='09:30';
+  // プレビューリセット
+  const prev=document.getElementById('lp-lv-hours-preview');
+  if(prev){ prev.textContent='→ 1時間の有休（60分間）'; prev.style.color='#79c0ff'; }
   document.getElementById('lp-leave-modal').style.display='flex';
 }
 
@@ -2151,10 +2167,12 @@ async function saveLeave(){
   if(!date){alert('日付を入力してください');return;}
   let type=typeVal;
   if(typeVal==='時間'){
-    const st=parseInt(document.getElementById('lp-lv-st').value);
-    const en=parseInt(document.getElementById('lp-lv-en').value);
-    if(en<=st){alert('終了時刻は開始時刻より後にしてください');return;}
-    type=`時間:${String(st).padStart(2,'0')}-${String(en).padStart(2,'0')}`;
+    const stVal=document.getElementById('lp-lv-st').value; // "08:30"
+    const enVal=document.getElementById('lp-lv-en').value; // "09:31"
+    if(!stVal||!enVal){alert('時間帯を入力してください');return;}
+    const diffM=t2m(enVal)-t2m(stVal);
+    if(diffM<=0){alert('終了時刻は開始時刻より後にしてください');return;}
+    type=`時間:${stVal}-${enVal}`;
   }
   const ym=date.slice(0,7);
   KC.leaves=KC.leaves.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
