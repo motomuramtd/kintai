@@ -713,19 +713,31 @@ function calcDay(logs, emp) {
     earlyM = Math.floor((earlyOtEnd - inM) / 15) * 15;
   }
 
-  // ── 外出合計 ──
+  // ── 外出合計 & 外出/戻り時刻（最大2回）──
   let absM=0, goM=null;
+  const outings=[];  // [{go:'09:30', back:'10:15'}, ...]  最大2件
+  let curGoStr=null;
   logs.forEach(l=>{
     const t=t2m(l.time);
-    if (l.type==='外出') goM=t;
-    else if ((l.type==='戻り'||l.type==='退勤')&&goM!==null){ absM+=t-goM; goM=null; }
+    if (l.type==='外出') {
+      goM=t;
+      if(outings.length<2) curGoStr=l.time.slice(0,5);
+    } else if ((l.type==='戻り'||l.type==='退勤')&&goM!==null){
+      absM+=t-goM; goM=null;
+      if(curGoStr!==null){
+        if(outings.length<2) outings.push({go:curGoStr, back:l.type==='退勤'?null:l.time.slice(0,5)});
+        curGoStr=null;
+      }
+    }
   });
+  // 外出中のまま（戻り未打刻）
+  if(curGoStr!==null && outings.length<2) outings.push({go:curGoStr, back:null});
 
-  if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null };
+  if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null, outings };
 
   // ── 始業前退勤 → 欠勤扱い（体調不良等で始業時刻前に退勤した場合） ──
   if (outM < workSt) {
-    return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM:null, otM:null, isPreworkAbsent:true };
+    return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM:null, otM:null, isPreworkAbsent:true, outings };
   }
 
   // ── 残業: (終業+15分)起点 15分刻み切り捨て ──
@@ -758,7 +770,7 @@ function calcDay(logs, emp) {
   if (outM>bs && inM<be) brk=Math.max(0, Math.min(outM,be)-Math.max(inM,bs));
   const workM = stay - brk;
 
-  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM, lateArrM, earlyLeaveM };
+  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM, lateArrM, earlyLeaveM, outings };
 }
 
 function aggPeriod(empId, start, end) {
@@ -1160,7 +1172,19 @@ function renderMiniGrid(todayMap) {
       else if (last.type==='退勤') st='done';
     }
     const label={none:'未出勤',in:'出勤中',out:'外出中',done:'退勤済'}[st];
-    const time = last ? last.time.slice(0,5) : ''; // 秒を削除 HH:MM のみ表示
+    const time = last ? last.time.slice(0,5) : '';
+
+    // 外出中の場合: 外出時刻を表示
+    let subInfo = '';
+    if (st==='out') {
+      const goRec = [...recs].reverse().find(r=>r.type==='外出');
+      if(goRec) subInfo=`<div style="font-size:9px;color:#f39c12;margin-top:2px">外出 ${goRec.time.slice(0,5)}</div>`;
+    } else if (st==='in') {
+      // 戻り済みの外出があればその回数を表示
+      const outCnt = recs.filter(r=>r.type==='外出').length;
+      if(outCnt>0) subInfo=`<div style="font-size:9px;color:#8b949e;margin-top:2px">外出${outCnt}回</div>`;
+    }
+
     const card = document.createElement('div');
     card.className = `mini-card mc-${st}`;
     card.innerHTML = `
@@ -1169,6 +1193,7 @@ function renderMiniGrid(todayMap) {
         <div class="mini-card-name">${emp.name}</div>
         <span class="mini-card-badge">${label}</span>
         <div class="mini-card-time">${time||'—'}</div>
+        ${subInfo}
       </div>`;
     grid.appendChild(card);
   });
@@ -1481,7 +1506,10 @@ async function renderIndividualPage() {
     <table class="tbl">
       <thead><tr>
         <th>日付</th><th>曜</th>
-        <th class="r">出勤</th><th class="r">退勤</th>
+        <th class="r">出勤</th>
+        <th class="r" style="color:#f39c12">外出①</th><th class="r" style="color:#27ae60">戻①</th>
+        <th class="r" style="color:#f39c12">外出②</th><th class="r" style="color:#27ae60">戻②</th>
+        <th class="r">退勤</th>
         <th class="r">実働</th>
         <th class="r" style="color:#58a6ff">早出</th>
         <th class="r" style="color:#d29922">残業</th>
@@ -1511,7 +1539,7 @@ async function renderIndividualPage() {
       html+=`<tr class="day-row-off" style="${todaySty}">
         <td style="color:${isToday?'#58a6ff':'#8b949e'}">${dateLabel}</td>
         <td style="color:${dowColor}">${dowLabel}</td>
-        <td colspan="7" style="text-align:center;color:#4a5060">${hasPunch&&st?`${st.inT||'—'} → ${st.outT||'未退勤'}（出勤記録あり）`:`${offLabel}${jpN}`}</td>
+        <td colspan="11" style="text-align:center;color:#4a5060">${hasPunch&&st?`${st.inT||'—'} → ${st.outT||'未退勤'}（出勤記録あり）`:`${offLabel}${jpN}`}</td>
         <td>${hasPunch?'<span class="tag t-warn">出勤</span>':'<span class="tag t-muted">休日</span>'}</td>
       </tr>`;
     } else if(st && st.isPreworkAbsent){
@@ -1520,6 +1548,7 @@ async function renderIndividualPage() {
         <td style="color:${isToday?'#58a6ff':'#f85149'}">${dateLabel}</td>
         <td style="color:${dowColor}">${dowLabel}</td>
         <td class="r" style="color:#8b949e">${st.inT}</td>
+        <td colspan="4" style="color:#4a5060;text-align:center;font-size:10px">外出なし</td>
         <td class="r" style="color:#8b949e">${st.outT}</td>
         <td colspan="5" style="text-align:center;color:#f85149;font-size:11px">始業前退勤（欠勤扱い）</td>
         <td><span class="tag t-danger">欠勤</span></td>
@@ -1531,6 +1560,7 @@ async function renderIndividualPage() {
         <td style="color:${isToday?'#58a6ff':'inherit'}">${dateLabel}</td>
         <td style="color:${dowColor}">${dowLabel}</td>
         <td class="r">${hasIn?logs.find(l=>l.type==='出勤').time.slice(0,5):'—'}</td>
+        <td colspan="4" class="r" style="color:#4a5060;text-align:center">—</td>
         <td class="r">—</td>
         <td colspan="5" style="text-align:center;color:#4a5060">${hasIn?'退勤打刻なし':'打刻なし'}</td>
         <td><span class="tag t-muted">${hasIn?'退勤未':'欠勤'}</span></td>
@@ -1540,11 +1570,18 @@ async function renderIndividualPage() {
       const otCls=st.otM>=(otLimit||45*60)?'danger':st.otM>=(otLimit||45*60)*.8?'warn':'ok';
       const lateCell=st.lateArrM>0?`<td class="r" style="color:#f0a030">${m2hm(st.lateArrM)}</td>`:`<td class="r c-muted">—</td>`;
       const elCell=st.earlyLeaveM>0?`<td class="r" style="color:#e67e22">${m2hm(st.earlyLeaveM)}</td>`:`<td class="r c-muted">—</td>`;
+      const outs=st.outings||[];
+      const o1=outs[0]||null, o2=outs[1]||null;
+      const goStyle='color:#f39c12', backStyle='color:#27ae60';
       html+=`<tr style="${todaySty}">
         <td style="color:${isToday?'#58a6ff':'inherit'}">${dateLabel}</td>
         <td style="color:${dowColor}">${dowLabel}</td>
         <td class="r">${st.inT}</td>
-        <td class="r">${st.outT||'—'}</td>
+        <td class="r" style="${goStyle}">${o1?o1.go:'<span style="color:#4a5060">—</span>'}</td>
+        <td class="r" style="${backStyle}">${o1?(o1.back||'<span style="color:#f85149">外出中</span>'):'<span style="color:#4a5060">—</span>'}</td>
+        <td class="r" style="${goStyle}">${o2?o2.go:'<span style="color:#4a5060">—</span>'}</td>
+        <td class="r" style="${backStyle}">${o2?(o2.back||'<span style="color:#f85149">外出中</span>'):'<span style="color:#4a5060">—</span>'}</td>
+        <td class="r">${st.outT||'<span style="color:#f85149">退勤未</span>'}</td>
         <td class="r">${m2hm(st.workM)}</td>
         <td class="r" style="color:#58a6ff">${st.earlyM>0?m2hm(st.earlyM):'—'}</td>
         <td class="r ${otCls!=='ok'?'c-'+otCls+'-cell':''}">${st.lateM>0?m2hm(st.lateM):'—'}</td>
