@@ -386,6 +386,7 @@
             <select id="m-view" onchange="renderMonthlyPage()">
               <option value="days">出勤日数</option>
               <option value="work">実働時間</option>
+              <option value="abs">外出時間</option>
               <option value="ot">残業時間</option>
             </select>
             <button class="btn-export" onclick="exportMonthlyCsv()" style="margin-left:auto">📥 CSV出力</button>
@@ -427,7 +428,7 @@
             <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
             <div style="overflow-x:auto">
               <table class="tbl">
-                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
+                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
                 <tbody id="ot-detail-tbody"></tbody>
               </table>
             </div>
@@ -733,11 +734,11 @@ function calcDay(logs, emp) {
   // 外出中のまま（戻り未打刻）
   if(curGoStr!==null && outings.length<2) outings.push({go:curGoStr, back:null});
 
-  if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null, outings };
+  if (!outM) return { inT:ci.time.slice(0,5), outT:null, workM:null, otM:null, absM, outings };
 
   // ── 始業前退勤 → 欠勤扱い（体調不良等で始業時刻前に退勤した場合） ──
   if (outM < workSt) {
-    return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM:null, otM:null, isPreworkAbsent:true, outings };
+    return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM:null, otM:null, isPreworkAbsent:true, absM, outings };
   }
 
   // ── 残業: (終業+15分)起点 15分刻み切り捨て ──
@@ -770,13 +771,13 @@ function calcDay(logs, emp) {
   if (outM>bs && inM<be) brk=Math.max(0, Math.min(outM,be)-Math.max(inM,bs));
   const workM = stay - brk;
 
-  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM, lateArrM, earlyLeaveM, outings };
+  return { inT:ci.time.slice(0,5), outT:co.time.slice(0,5), workM, otM, earlyM, lateM, lateArrM, earlyLeaveM, absM, outings };
 }
 
 function aggPeriod(empId, start, end) {
   // シフト情報を社員マスタから取得（シフト勤務対応）
   const emp = (typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
-  let days=0, workM=0, otM=0, earlyM=0, lateM=0, lateArrM=0, earlyLeaveM=0;
+  let days=0, workM=0, otM=0, earlyM=0, lateM=0, lateArrM=0, earlyLeaveM=0, absM=0;
   let d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
   while (d<=ed) {
     const ds=d.toLocaleDateString('sv');
@@ -785,13 +786,14 @@ function aggPeriod(empId, start, end) {
       days++; workM+=st.workM; otM+=st.otM||0;
       earlyM+=st.earlyM||0; lateM+=st.lateM||0;
       lateArrM+=st.lateArrM||0; earlyLeaveM+=st.earlyLeaveM||0;
+      absM+=st.absM||0;
     } else if (logs.some(r=>r.type==='出勤') && !st?.isPreworkAbsent) {
       // 退勤未打刻は出勤日扱い。始業前退勤（体調不良等）は欠勤なのでカウントしない
       days++;
     }
     d.setDate(d.getDate()+1);
   }
-  return { days, workM, otM, earlyM, lateM, lateArrM, earlyLeaveM };
+  return { days, workM, otM, earlyM, lateM, lateArrM, earlyLeaveM, absM };
 }
 
 // ================================================================
@@ -1229,6 +1231,7 @@ async function renderMonthlyPage() {
       if (vt==='days'&&s.days>0){ val=`${s.days}日`; cls=''; tot+=s.days; }
       else if (vt==='work'&&s.workM>0){ val=m2hm(s.workM); cls=''; tot+=s.workM; }
       else if (vt==='ot'&&s.otM>0){ val=m2hm(s.otM); cls=s.otM>=otLimit?'m-ot-hi':s.otM>=otLimit*.7?'m-ot':''; tot+=s.otM; }
+      else if (vt==='abs'&&s.absM>0){ val=`<span style="color:#f39c12">${m2hm(s.absM)}</span>`; cls=''; tot+=s.absM; }
       html+=`<td class="${cls}">${val}</td>`;
     });
     const totStr=vt==='days'?`${tot}日`:(tot>0?m2hm(tot):'—');
@@ -1242,6 +1245,7 @@ async function renderMonthlyPage() {
     allSt.forEach(({ps})=>{
       if(vt==='days') tot+=ps[pi].days;
       else if(vt==='work') tot+=ps[pi].workM;
+      else if(vt==='abs') tot+=ps[pi].absM||0;
       else tot+=ps[pi].otM;
     });
     html+=`<td>${vt==='days'?tot+'日':tot>0?m2hm(tot):'—'}</td>`;
@@ -1259,7 +1263,7 @@ function exportMonthlyCsv() {
     const ps=periods.map(p=>aggPeriod(emp.id,p.start,p.end));
     let tot=0;
     const cells=ps.map(s=>{
-      let v=vt==='days'?s.days:vt==='work'?s.workM:s.otM; tot+=v;
+      let v=vt==='days'?s.days:vt==='work'?s.workM:vt==='abs'?(s.absM||0):s.otM; tot+=v;
       return vt==='days'?v:(v/60).toFixed(2);
     });
     return [emp.id,emp.name,emp.group||'',...cells,vt==='days'?tot:(tot/60).toFixed(2)].join(',');
@@ -1329,6 +1333,7 @@ async function renderOvertimePage() {
       <td style="color:#a78bfa;font-size:11px">${e.shift||'—'}</td>
       <td class="r">${e.days}日</td>
       <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
+      <td class="r" style="color:#f39c12">${e.absM>0?m2hm(e.absM):'—'}</td>
       <td class="r" style="color:#58a6ff">${e.earlyM>0?m2hm(e.earlyM):'—'}</td>
       <td class="r" style="color:#d29922">${e.lateM>0?m2hm(e.lateM):'—'}</td>
       <td class="r" style="color:#e67e22">${e.earlyLeaveM>0?m2hm(e.earlyLeaveM):'—'}</td>
@@ -1438,7 +1443,7 @@ async function renderIndividualPage() {
         </div>
       </div>
       <table class="tbl">
-        <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
+        <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
         <tbody>`;
     pst.forEach(p=>{
       const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
@@ -1449,6 +1454,7 @@ async function renderIndividualPage() {
         <td style="color:#8b949e;font-size:11px">${p.tip}</td>
         <td class="r">${p.days>0?p.days+'日':'—'}</td>
         <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
+        <td class="r" style="color:#f39c12">${p.absM>0?m2hm(p.absM):'—'}</td>
         <td class="r" style="color:#58a6ff">${p.earlyM>0?m2hm(p.earlyM):'—'}</td>
         <td class="r" style="color:#d29922">${p.lateM>0?m2hm(p.lateM):'—'}</td>
         <td class="r" style="color:#e67e22">${p.earlyLeaveM>0?m2hm(p.earlyLeaveM):'—'}</td>
