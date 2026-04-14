@@ -1883,15 +1883,37 @@ function leaveBgCls(type){
 }
 // 時間有休の時刻文字列を "HH:MM" 形式に正規化（旧フォーマット "09" → "09:00" に対応）
 function _lvNormTime(s){ return s&&s.includes(':')?s:`${String(s||'0').padStart(2,'0')}:00`; }
-// "時間:HH:MM-HH:MM" または旧 "時間:HH-HH" から {sStr, eStr, diffM, hours} を取り出す
+
+// 昼休憩（12:00〜12:45）を除いた正味有休時間（分）を返す
+function calcLeaveNetMinutes(stStr, enStr){
+  const stM=t2m(stStr), enM=t2m(enStr);
+  if(enM<=stM) return 0;
+  let m=enM-stM;
+  // 昼休憩オーバーラップを差し引く（12:00〜12:45 = 45分）
+  const ls=t2m('12:00'), le=t2m('12:45');
+  const os=Math.max(stM,ls), oe=Math.min(enM,le);
+  if(oe>os) m-=(oe-os);
+  return Math.max(0,m);
+}
+
+// 入力時刻が有効範囲か判定（08:30〜12:00 または 12:45〜17:00）
+function isValidLeaveTimeInput(timeStr){
+  if(!timeStr) return false;
+  const m=t2m(timeStr);
+  if(m<t2m('08:30')||m>t2m('17:00')) return false;
+  if(m>t2m('12:00')&&m<t2m('12:45')) return false; // 12:01〜12:44 は不可
+  return true;
+}
+
+// "時間:HH:MM-HH:MM" または旧 "時間:HH-HH" から {sStr, eStr, netM, hours} を取り出す
 function _lvParseJikan(type){
   const p=type.slice(3); // "08:30-09:31" or "09-12"
   const dash=p.indexOf('-');
   const sRaw=p.slice(0,dash), eRaw=p.slice(dash+1);
   const sStr=_lvNormTime(sRaw), eStr=_lvNormTime(eRaw);
-  const diffM=t2m(eStr)-t2m(sStr);
-  const hours=diffM>0?Math.ceil(diffM/60):0;
-  return {sStr,eStr,diffM,hours};
+  const netM=calcLeaveNetMinutes(sStr,eStr);
+  const hours=netM>0?Math.ceil(netM/60):0;
+  return {sStr,eStr,diffM:netM,hours};
 }
 function leaveTypeLabel(type){
   if(!type) return '—';
@@ -2078,12 +2100,13 @@ function renderLpContent(empId){
           </label>
         </div>
         <div id="lp-lv-time-row" style="display:none;margin-bottom:12px;background:#0d1117;border-radius:8px;padding:10px">
-          <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:6px">時間帯（1分単位で入力）</label>
+          <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">時間帯（1分単位）</label>
+          <div style="font-size:10px;color:#6e7681;margin-bottom:6px">有効範囲: 8:30〜12:00 または 12:45〜17:00　※昼休憩(12:00〜12:45)は計算から除外</div>
           <div style="display:flex;align-items:center;gap:8px">
-            <input type="time" id="lp-lv-st" value="08:30" step="60"
+            <input type="time" id="lp-lv-st" value="08:30" min="08:30" max="17:00" step="60"
               style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
             <span style="color:#8b949e;font-weight:700">〜</span>
-            <input type="time" id="lp-lv-en" value="09:30" step="60"
+            <input type="time" id="lp-lv-en" value="09:30" min="08:30" max="17:00" step="60"
               style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
           </div>
           <div id="lp-lv-hours-preview" style="font-size:12px;color:#79c0ff;margin-top:6px;text-align:center;font-weight:600"></div>
@@ -2116,24 +2139,41 @@ function renderLpContent(empId){
       </div>
     </div>`;
 
-  // Set up time preview update（1分単位・切り上げ）
+  // Set up time preview update（バリデーション＋昼休憩除外・切り上げ）
   const stEl=document.getElementById('lp-lv-st');
   const enEl=document.getElementById('lp-lv-en');
   if(stEl&&enEl){
+    const ERR_BORDER='#f85149', OK_BORDER='#30363d';
     const updatePreview=()=>{
       const s=stEl.value, e=enEl.value;
       const el=document.getElementById('lp-lv-hours-preview');
       if(!el)return;
-      if(s&&e){
-        const diffM=t2m(e)-t2m(s);
-        if(diffM>0){
-          const hours=Math.ceil(diffM/60);
-          el.textContent=`→ ${hours}時間の有休（${diffM}分間）`;
-          el.style.color='#79c0ff';
-        } else {
-          el.textContent='⚠ 終了時刻は開始より後にしてください';
-          el.style.color='#f85149';
-        }
+      if(!s||!e){ el.textContent=''; return; }
+      const sOk=isValidLeaveTimeInput(s);
+      const eOk=isValidLeaveTimeInput(e);
+      stEl.style.borderColor=sOk?OK_BORDER:ERR_BORDER;
+      enEl.style.borderColor=eOk?OK_BORDER:ERR_BORDER;
+      if(!sOk){
+        el.textContent='⚠ 開始: 8:30〜12:00 または 12:45〜17:00 で入力してください';
+        el.style.color=ERR_BORDER; return;
+      }
+      if(!eOk){
+        el.textContent='⚠ 終了: 8:30〜12:00 または 12:45〜17:00 で入力してください';
+        el.style.color=ERR_BORDER; return;
+      }
+      const netM=calcLeaveNetMinutes(s,e);
+      if(netM<=0){
+        el.textContent='⚠ 終了時刻は開始時刻より後にしてください';
+        el.style.color=ERR_BORDER;
+      } else {
+        const hours=Math.ceil(netM/60);
+        const rawM=t2m(e)-t2m(s);
+        const lunchM=rawM-netM;
+        let txt=`→ ${hours}時間の有休（正味 ${netM}分`;
+        if(lunchM>0) txt+=`・昼休憩 ${lunchM}分除く`;
+        txt+=`）`;
+        el.textContent=txt;
+        el.style.color='#79c0ff';
       }
     };
     stEl.addEventListener('input',updatePreview);
@@ -2167,11 +2207,19 @@ async function saveLeave(){
   if(!date){alert('日付を入力してください');return;}
   let type=typeVal;
   if(typeVal==='時間'){
-    const stVal=document.getElementById('lp-lv-st').value; // "08:30"
-    const enVal=document.getElementById('lp-lv-en').value; // "09:31"
+    const stVal=document.getElementById('lp-lv-st').value;
+    const enVal=document.getElementById('lp-lv-en').value;
     if(!stVal||!enVal){alert('時間帯を入力してください');return;}
-    const diffM=t2m(enVal)-t2m(stVal);
-    if(diffM<=0){alert('終了時刻は開始時刻より後にしてください');return;}
+    if(!isValidLeaveTimeInput(stVal)){
+      alert('開始時刻は 8:30〜12:00 または 12:45〜17:00 の範囲で入力してください\n（昼休憩 12:01〜12:44 は入力不可）');
+      return;
+    }
+    if(!isValidLeaveTimeInput(enVal)){
+      alert('終了時刻は 8:30〜12:00 または 12:45〜17:00 の範囲で入力してください\n（昼休憩 12:01〜12:44 は入力不可）');
+      return;
+    }
+    const netM=calcLeaveNetMinutes(stVal,enVal);
+    if(netM<=0){alert('終了時刻は開始時刻より後にしてください');return;}
     type=`時間:${stVal}-${enVal}`;
   }
   const ym=date.slice(0,7);
