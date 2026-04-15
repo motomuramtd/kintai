@@ -2337,6 +2337,28 @@ async function saveLeave(){
     if(netM<=0){alert('終了時刻は開始時刻より後にしてください');return;}
     type=`時間:${stVal}-${enVal}`;
   }
+
+  // ── 優先順位チェック: 有休 > 休暇 > 残業予定 ──
+  // 同日に休暇または残業予定が登録済みの場合は確認・削除してから有休を登録
+  const conflictVacs=KC.vacations.filter(v=>v.id===_lpCurEmpId&&v.startDate<=date&&date<=v.endDate);
+  const conflictOts =KC.otPlans.filter(l=>l.id===_lpCurEmpId&&l.date===date);
+  if(conflictVacs.length>0||conflictOts.length>0){
+    let msg='以下の登録があります。有休を優先して削除しますか？\n\n';
+    conflictVacs.forEach(v=>{ msg+=`■ 休暇: ${v.startDate}〜${v.endDate}（${v.reason}）\n`; });
+    conflictOts.forEach(l=>{ msg+=`■ 残業予定: ${l.date}（残業${l.hours}h${l.earlyH>0?` / 早出${l.earlyH}h`:''}）\n`; });
+    msg+='\n削除して有休を登録しますか？';
+    if(!confirm(msg)) return;
+    // 削除実行
+    if(conflictVacs.length>0){
+      KC.vacations=KC.vacations.filter(v=>!conflictVacs.includes(v));
+      try{ await saveKSheet('休暇管理',KC.vacations.map(v=>[v.id,v.startDate,v.endDate,v.reason,v.memo])); }catch(e){}
+    }
+    if(conflictOts.length>0){
+      KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
+      try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); }catch(e){}
+    }
+  }
+
   const ym=date.slice(0,7);
   KC.leaves=KC.leaves.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
   KC.leaves.push({id:_lpCurEmpId,ym,date,type,memo});
@@ -2369,6 +2391,21 @@ async function saveOtPlan(){
   const earlyH=parseFloat(document.getElementById('lp-plan-early').value)||0;
   const memo=document.getElementById('lp-plan-memo').value.trim();
   if(!date){alert('日付を入力してください');return;}
+
+  // ── 優先順位チェック: 有休 > 休暇 > 残業予定 ──
+  // 同日に有休が登録済みの場合は残業予定を登録不可（有休最優先）
+  const conflictLeave=KC.leaves.find(l=>l.id===_lpCurEmpId&&l.date===date);
+  if(conflictLeave){
+    alert(`${date} に有休が登録済みです（${leaveTypeLabel(conflictLeave.type)}）。\n有休を優先するため、残業予定を登録できません。`);
+    return;
+  }
+  // 同日が休暇期間内の場合も登録不可（休暇は有休の次の優先）
+  const conflictVac=KC.vacations.find(v=>v.id===_lpCurEmpId&&v.startDate<=date&&date<=v.endDate);
+  if(conflictVac){
+    alert(`${date} は休暇期間内です（${conflictVac.reason}: ${conflictVac.startDate}〜${conflictVac.endDate}）。\n休暇中のため、残業予定を登録できません。`);
+    return;
+  }
+
   KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
   KC.otPlans.push({id:_lpCurEmpId,ym:date.slice(0,7),date,hours,memo,earlyH});
   document.getElementById('lp-plan-modal').style.display='none';
@@ -2417,6 +2454,24 @@ async function saveVacation(){
   const memo=document.getElementById('lp-vac-memo').value.trim();
   if(!startDate||!endDate){alert('開始日・終了日を入力してください');return;}
   if(endDate<startDate){alert('終了日は開始日以降にしてください');return;}
+
+  // ── 優先順位チェック: 有休 > 休暇 > 残業予定 ──
+  // 期間内に有休が登録済みの場合は登録を拒否（有休が最優先）
+  const conflictLeaves=KC.leaves.filter(l=>l.id===_lpCurEmpId&&l.date>=startDate&&l.date<=endDate);
+  if(conflictLeaves.length>0){
+    const dates=conflictLeaves.map(l=>`${l.date}（${leaveTypeLabel(l.type)}）`).join('\n');
+    alert(`以下の日に有休が登録済みです。有休を優先するため、休暇を登録できません。\n\n${dates}\n\n有休を取り消す場合は先に有休を削除してください。`);
+    return;
+  }
+  // 期間内に残業予定が登録済みの場合は確認・削除してから休暇を登録
+  const conflictOts=KC.otPlans.filter(l=>l.id===_lpCurEmpId&&l.date>=startDate&&l.date<=endDate);
+  if(conflictOts.length>0){
+    const lines=conflictOts.map(l=>`■ 残業予定: ${l.date}（残業${l.hours}h${l.earlyH>0?` / 早出${l.earlyH}h`:''}）`).join('\n');
+    if(!confirm(`以下の残業予定の登録があります。削除して休暇を登録しますか？\n\n${lines}`)) return;
+    KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date>=startDate&&l.date<=endDate));
+    try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); }catch(e){}
+  }
+
   // 同一社員・同一開始日は上書き
   KC.vacations=KC.vacations.filter(v=>!(v.id===_lpCurEmpId&&v.startDate===startDate));
   KC.vacations.push({id:_lpCurEmpId,startDate,endDate,reason,memo});
