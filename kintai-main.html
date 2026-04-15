@@ -131,6 +131,7 @@
     .ot-cal-cell.ot-cal-holiday{background:#2a1010;opacity:.6}
     .ot-cal-cell.ot-cal-empty{background:transparent;border:none}
     .ot-cal-cell.ot-cal-has-data{background:#1a2a1a;border-color:#27ae60}
+    .ot-cal-cell.ot-cal-kakutei{background:#2a1a00;border-color:#d29922;box-shadow:0 0 6px rgba(210,153,34,.3)}
     .ot-cal-day-num{font-size:15px;font-weight:700;line-height:1;width:100%;text-align:center}
     .ot-cal-inp{width:100%;background:transparent;border:none;border-bottom:1px solid #30363d;color:#e6edf3;font-size:14px;text-align:center;outline:none;padding:2px 0;-moz-appearance:textfield}
     .ot-cal-inp::-webkit-outer-spin-button,.ot-cal-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -508,18 +509,16 @@
     <!-- ヘッダー -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
-        <h3 style="font-size:16px;margin-bottom:2px">📋 残業登録</h3>
-        <div id="ot-cal-emp-label" style="font-size:12px;color:#8b949e"></div>
+        <h3 style="font-size:16px;margin-bottom:4px">📋 残業登録</h3>
+        <div id="ot-cal-emp-label" style="font-size:24px;color:#cdd9e5;font-weight:700"></div>
       </div>
       <button onclick="document.getElementById('ot-cal-modal').style.display='none'"
         style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer;line-height:1;padding:4px">✕</button>
     </div>
-    <!-- 区分トグル（クリックで予定⇔確定） -->
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap">
-      <span style="font-size:12px;color:#8b949e;flex-shrink:0">区分</span>
-      <button id="ot-kubun-toggle" class="kubun-toggle yotei" onclick="toggleOtKubun()">予定</button>
-      <span style="font-size:11px;color:#6e7681">← クリックで切替</span>
-      <span style="font-size:11px;color:#6e7681;margin-left:auto;white-space:nowrap">🔵早出(h)　🟡残業(h)</span>
+    <!-- 操作ヒント -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;font-size:11px;color:#6e7681;flex-wrap:wrap">
+      <span>🔵 早出(h)　🟡 残業(h)</span>
+      <span style="margin-left:auto">枠をクリック: <span style="color:#27ae60">予定</span> ⇋ <span style="color:#d29922">確定</span> の切替</span>
     </div>
     <!-- 月ナビ（21日〜20日期間） -->
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -2510,6 +2509,7 @@ function quickRegLeave(empId){
 }
 // ── 残業カレンダー登録 ───────────────────────────────────────────
 let _otCalEmpId='', _otCalKubun='予定', _otCalYear1=0, _otCalMonth1=0;
+let _otCalKubunMap={}; // 日別区分マップ {date: '予定'|'確定'}
 
 function openOtCalModal(empId){
   _otCalEmpId=empId; _lpCurEmpId=empId;
@@ -2518,9 +2518,11 @@ function openOtCalModal(empId){
   let m=now.getMonth()+1, y=now.getFullYear();
   if(now.getDate()>20){m++; if(m>12){m=1;y++;}}
   _otCalYear1=y; _otCalMonth1=m; _otCalKubun='予定';
+  // 既存データから日別区分マップを初期化
+  _otCalKubunMap={};
+  KC.otPlans.filter(l=>l.id===empId).forEach(l=>{ _otCalKubunMap[l.date]=l.kubun||'予定'; });
   const emp=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
-  document.getElementById('ot-cal-emp-label').textContent=emp?`${emp.name}（${emp.group||'—'}）`:'';
-  setOtKubun('予定');
+  document.getElementById('ot-cal-emp-label').textContent=emp?`${emp.name}`:''
   renderOtCalModal();
   document.getElementById('ot-cal-modal').style.display='flex';
 }
@@ -2590,17 +2592,18 @@ function renderOtCalModal(){
       </div>`;
     } else {
       const hasData=ex&&(ex.earlyH>0||ex.hours>0);
-      const kb=ex?ex.kubun||'予定':'';
-      const kbBadge=kb?`<div style="font-size:7px;color:${kb==='確定'?'#3fb950':'#58a6ff'};line-height:1.2">${kb}</div>`:'';
-      html+=`<div class="ot-cal-cell${isToday?' ot-cal-today':''}${hasData?' ot-cal-has-data':''}">
+      const kb=_otCalKubunMap[ds]||'予定';
+      const isKakutei=kb==='確定';
+      const cellCls=`ot-cal-cell${isToday?' ot-cal-today':''}${hasData?(isKakutei?' ot-cal-kakutei':' ot-cal-has-data'):''}`;
+      html+=`<div id="ot-cell-${ds}" class="${cellCls}" style="cursor:pointer" onclick="if(event.target.tagName!=='INPUT')toggleCellKubun('${ds}')">
         <div class="ot-cal-day-num" style="color:${numColor};font-size:${numSize}">${label}</div>
-        ${kbBadge}
+        <div id="ot-kb-${ds}" style="font-size:9px;font-weight:700;line-height:1.2;min-height:12px;color:${hasData?(isKakutei?'#d29922':'#27ae60'):'transparent'}">${hasData?kb:''}</div>
         <input type="number" id="ot-inp-early-${ds}" class="ot-cal-inp early${ex&&ex.earlyH>0?' has-val':''}"
           placeholder="早" step="0.25" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
-          oninput="otCalHighlight(this)">
+          oninput="otCalHighlight(this,'${ds}')">
         <input type="number" id="ot-inp-ot-${ds}" class="ot-cal-inp ot${ex&&ex.hours>0?' has-val':''}"
           placeholder="残" step="0.25" min="0" max="8" value="${ex&&ex.hours>0?ex.hours:''}"
-          oninput="otCalHighlight(this)">
+          oninput="otCalHighlight(this,'${ds}')">
       </div>`;
     }
   });
@@ -2608,19 +2611,42 @@ function renderOtCalModal(){
   document.getElementById('ot-cal-content').innerHTML=html;
 }
 
-function otCalHighlight(el){
+function otCalHighlight(el, ds){
   if(parseFloat(el.value)>0) el.classList.add('has-val');
   else el.classList.remove('has-val');
-  const cell=el.closest('.ot-cal-cell');
+  _updateCellStyle(ds);
+}
+
+function toggleCellKubun(ds){
+  const earlyEl=document.getElementById(`ot-inp-early-${ds}`);
+  const otEl=document.getElementById(`ot-inp-ot-${ds}`);
+  const hasData=(parseFloat(earlyEl?.value)||0)>0||(parseFloat(otEl?.value)||0)>0;
+  if(!hasData) return; // データがない日はトグル不可
+  _otCalKubunMap[ds]=(_otCalKubunMap[ds]||'予定')==='予定'?'確定':'予定';
+  _updateCellStyle(ds);
+}
+
+function _updateCellStyle(ds){
+  const cell=document.getElementById(`ot-cell-${ds}`);
+  const badge=document.getElementById(`ot-kb-${ds}`);
   if(!cell) return;
   const earlyEl=cell.querySelector('.early'), otEl=cell.querySelector('.ot');
-  cell.classList.toggle('ot-cal-has-data',(parseFloat(earlyEl?.value)||0)>0||(parseFloat(otEl?.value)||0)>0);
+  const hasData=(parseFloat(earlyEl?.value)||0)>0||(parseFloat(otEl?.value)||0)>0;
+  const kb=_otCalKubunMap[ds]||'予定';
+  const isKakutei=kb==='確定';
+  // セルクラス更新
+  cell.classList.remove('ot-cal-has-data','ot-cal-kakutei');
+  if(hasData) cell.classList.add(isKakutei?'ot-cal-kakutei':'ot-cal-has-data');
+  // バッジ更新
+  if(badge){
+    badge.textContent=hasData?kb:'';
+    badge.style.color=hasData?(isKakutei?'#d29922':'#27ae60'):'transparent';
+  }
 }
 
 async function saveOtCal(){
   const empId=_otCalEmpId;
   const memo='';
-  const kubun=_otCalKubun;
   const earlyEls=document.querySelectorAll('[id^="ot-inp-early-"]');
   const otEls=document.querySelectorAll('[id^="ot-inp-ot-"]');
   const updates={};
@@ -2637,7 +2663,7 @@ async function saveOtCal(){
   const shownDates=new Set(Object.keys(updates));
   KC.otPlans=KC.otPlans.filter(l=>!(l.id===empId&&shownDates.has(l.date)));
   Object.entries(updates).forEach(([date,{earlyH,hours}])=>{
-    if(earlyH>0||hours>0) KC.otPlans.push({id:empId,ym:date.slice(0,7),date,hours,earlyH,memo,kubun});
+    if(earlyH>0||hours>0) KC.otPlans.push({id:empId,ym:date.slice(0,7),date,hours,earlyH,memo,kubun:_otCalKubunMap[date]||'予定'});
   });
   document.getElementById('ot-cal-modal').style.display='none';
   try{
