@@ -349,9 +349,9 @@
             <div class="card"><h3>出勤人数（直近稼働3日）</h3><div id="d-headcount-list" style="margin-top:4px"></div></div>
           </div>
           <!-- チャート -->
-          <div class="card-row cols-2">
+          <div class="card-row" style="grid-template-columns:2fr 1fr">
             <div class="chart-card">
-              <h3>月次残業時間推移（直近6ヶ月・合計）</h3>
+              <h3>月次残業時間推移（当期12ヶ月・合計）</h3>
               <div class="chart-wrap" style="height:210px"><canvas id="ch-trend"></canvas></div>
             </div>
             <div class="chart-card">
@@ -1137,9 +1137,9 @@ async function renderDashboard() {
   const cp=curPeriod(fy);
   document.getElementById('d-period-label').textContent=`集計期間: ${cp.tip}`;
 
-  // 直近6ヶ月 + 今月のシートを並列読み込み
-  const recent=periods.slice(-6);
-  await ensureSheets(sheetsFor([cp,...recent]));
+  // 当期12ヶ月分のシートを読み込み
+  const recent=periods; // 当期1月〜12月（全12期）
+  await ensureSheets(sheetsFor(periods));
 
   // ── 診断ログ ──
   const totalRecs = Object.values(SC).reduce((s,m)=>s+Object.values(m).reduce((s2,d)=>s2+Object.values(d).reduce((s3,a)=>s3+a.length,0),0),0);
