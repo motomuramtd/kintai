@@ -500,7 +500,7 @@
 
 <!-- ===== 残業カレンダー登録モーダル ===== -->
 <div id="ot-cal-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:300;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
-  <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:20px 22px;width:100%;max-width:860px;margin:auto">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:20px 22px;width:100%;max-width:560px;margin:auto">
     <!-- ヘッダー -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
@@ -510,24 +510,21 @@
       <button onclick="document.getElementById('ot-cal-modal').style.display='none'"
         style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer;line-height:1;padding:4px">✕</button>
     </div>
-    <!-- 区分 + メモ -->
+    <!-- 区分 -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       <span style="font-size:12px;color:#8b949e;flex-shrink:0">区分</span>
       <button id="ot-kubun-yotei" class="kubun-btn active-yotei" onclick="setOtKubun('予定')">予定</button>
       <button id="ot-kubun-kakutei" class="kubun-btn" onclick="setOtKubun('確定')">確定</button>
-      <span style="font-size:12px;color:#8b949e;margin-left:12px;flex-shrink:0">メモ</span>
-      <input type="text" id="ot-cal-memo" placeholder="任意"
-        style="flex:1;min-width:120px;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:6px 10px;border-radius:6px;font-size:12px">
-      <span style="font-size:10px;color:#6e7681;white-space:nowrap">🔵早出(h)　🟡残業(h)</span>
+      <span style="font-size:10px;color:#6e7681;margin-left:auto;white-space:nowrap">🔵早出(h)　🟡残業(h)</span>
     </div>
-    <!-- 月ナビ -->
+    <!-- 月ナビ（21日〜20日期間） -->
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <button class="pb-btn" onclick="changeOtCalMonth(-1)">◀</button>
-      <span id="ot-cal-nav-label" style="font-size:13px;font-weight:700;color:#cdd9e5;min-width:160px;text-align:center"></span>
+      <span id="ot-cal-nav-label" style="font-size:13px;font-weight:700;color:#cdd9e5;min-width:200px;text-align:center"></span>
       <button class="pb-btn" onclick="changeOtCalMonth(1)">▶</button>
     </div>
-    <!-- カレンダー本体（2ヶ月） -->
-    <div id="ot-cal-content" style="display:flex;gap:16px;flex-wrap:wrap"></div>
+    <!-- カレンダー本体（当期1ヶ月分：21日〜20日） -->
+    <div id="ot-cal-content"></div>
     <!-- 保存ボタン -->
     <div style="display:flex;gap:8px;margin-top:16px">
       <button onclick="saveOtCal()" style="flex:1;background:#238636;border:none;color:#fff;padding:11px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">保存</button>
@@ -2512,11 +2509,13 @@ let _otCalEmpId='', _otCalKubun='予定', _otCalYear1=0, _otCalMonth1=0;
 
 function openOtCalModal(empId){
   _otCalEmpId=empId; _lpCurEmpId=empId;
+  // 当期（21日〜20日）を判定: 21日以降なら翌月が当月度
   const now=new Date();
-  _otCalYear1=now.getFullYear(); _otCalMonth1=now.getMonth()+1; _otCalKubun='予定';
+  let m=now.getMonth()+1, y=now.getFullYear();
+  if(now.getDate()>20){m++; if(m>12){m=1;y++;}}
+  _otCalYear1=y; _otCalMonth1=m; _otCalKubun='予定';
   const emp=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
   document.getElementById('ot-cal-emp-label').textContent=emp?`${emp.name}（${emp.group||'—'}）`:'';
-  document.getElementById('ot-cal-memo').value='';
   setOtKubun('予定');
   renderOtCalModal();
   document.getElementById('ot-cal-modal').style.display='flex';
@@ -2542,52 +2541,56 @@ function changeOtCalMonth(delta){
 function renderOtCalModal(){
   const today=new Date().toLocaleDateString('sv');
   const DOWS=['日','月','火','水','木','金','土'];
-  const m2=_otCalMonth1===12?1:_otCalMonth1+1;
-  const y2=_otCalMonth1===12?_otCalYear1+1:_otCalYear1;
-  const months=[{y:_otCalYear1,m:_otCalMonth1},{y:y2,m:m2}];
+  // 期間: 前月21日〜当月20日
+  const sm=_otCalMonth1===1?12:_otCalMonth1-1;
+  const sy=_otCalMonth1===1?_otCalYear1-1:_otCalYear1;
+  const startDs=`${sy}-${String(sm).padStart(2,'0')}-21`;
+  const endDs=`${_otCalYear1}-${String(_otCalMonth1).padStart(2,'0')}-20`;
   document.getElementById('ot-cal-nav-label').textContent=
-    `${_otCalYear1}年${_otCalMonth1}月 ・ ${y2}年${m2}月`;
+    `${sy}/${sm}/21 〜 ${_otCalYear1}/${_otCalMonth1}/20`;
+  // 全日付リスト生成
+  const dates=[];
+  {let d=new Date(startDs+'T00:00:00'),ed=new Date(endDs+'T00:00:00');
+   while(d<=ed){dates.push(d.toLocaleDateString('sv'));d.setDate(d.getDate()+1);}}
   const existing={};
   KC.otPlans.filter(l=>l.id===_otCalEmpId).forEach(l=>{existing[l.date]=l;});
-  let html='';
-  months.forEach(({y,m})=>{
-    const ym=`${y}-${String(m).padStart(2,'0')}`;
-    const firstDow=new Date(y,m-1,1).getDay();
-    const lastDate=new Date(y,m,0).getDate();
-    html+=`<div class="ot-cal-month-wrap">
-      <div class="ot-cal-month-hdr">${y}年${m}月</div>
-      <div class="ot-cal-grid">`;
-    DOWS.forEach((d,i)=>{
-      html+=`<div class="ot-cal-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#8b949e'}">${d}</div>`;
-    });
-    for(let i=0;i<firstDow;i++) html+='<div class="ot-cal-cell ot-cal-empty"></div>';
-    for(let d=1;d<=lastDate;d++){
-      const ds=`${ym}-${String(d).padStart(2,'0')}`;
-      const dow=new Date(ds+'T00:00:00').getDay();
-      const isHol=isHolidayDate(ds);
-      const isToday=ds===today;
-      const ex=existing[ds];
-      const numColor=dow===0?'#f85149':dow===6?'#58a6ff':isToday?'#58a6ff':'#cdd9e5';
-      if(isHol){
-        html+=`<div class="ot-cal-cell ot-cal-off"><div class="ot-cal-day-num" style="color:${numColor}">${d}</div></div>`;
-      } else {
-        const hasData=ex&&(ex.earlyH>0||ex.hours>0);
-        const kb=ex?ex.kubun||'予定':'';
-        const kbBadge=kb?`<div style="font-size:7px;color:${kb==='確定'?'#3fb950':'#58a6ff'};line-height:1.2">${kb}</div>`:'';
-        html+=`<div class="ot-cal-cell${isToday?' ot-cal-today':''}${hasData?' ot-cal-has-data':''}">
-          <div class="ot-cal-day-num" style="color:${numColor}">${d}</div>
-          ${kbBadge}
-          <input type="number" id="ot-inp-early-${ds}" class="ot-cal-inp early${ex&&ex.earlyH>0?' has-val':''}"
-            placeholder="早" step="0.25" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
-            oninput="otCalHighlight(this)">
-          <input type="number" id="ot-inp-ot-${ds}" class="ot-cal-inp ot${ex&&ex.hours>0?' has-val':''}"
-            placeholder="残" step="0.25" min="0" max="8" value="${ex&&ex.hours>0?ex.hours:''}"
-            oninput="otCalHighlight(this)">
-        </div>`;
-      }
-    }
-    html+='</div></div>';
+  const firstDow=new Date(startDs+'T00:00:00').getDay();
+  let html='<div class="ot-cal-grid">';
+  DOWS.forEach((d,i)=>{
+    html+=`<div class="ot-cal-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#8b949e'}">${d}</div>`;
   });
+  for(let i=0;i<firstDow;i++) html+='<div class="ot-cal-cell ot-cal-empty"></div>';
+  dates.forEach(ds=>{
+    const dow=new Date(ds+'T00:00:00').getDay();
+    const isHol=isHolidayDate(ds);
+    const isToday=ds===today;
+    const ex=existing[ds];
+    const dayNum=parseInt(ds.split('-')[2]);
+    const mon=parseInt(ds.split('-')[1]);
+    const label=dayNum===1?`${mon}/${dayNum}`:String(dayNum);
+    const numColor=dow===0?'#f85149':dow===6?'#58a6ff':isToday?'#58a6ff':'#cdd9e5';
+    const numSize=dayNum===1?'9px':'11px';
+    if(isHol){
+      html+=`<div class="ot-cal-cell ot-cal-off">
+        <div class="ot-cal-day-num" style="color:${numColor};font-size:${numSize}">${label}</div>
+      </div>`;
+    } else {
+      const hasData=ex&&(ex.earlyH>0||ex.hours>0);
+      const kb=ex?ex.kubun||'予定':'';
+      const kbBadge=kb?`<div style="font-size:7px;color:${kb==='確定'?'#3fb950':'#58a6ff'};line-height:1.2">${kb}</div>`:'';
+      html+=`<div class="ot-cal-cell${isToday?' ot-cal-today':''}${hasData?' ot-cal-has-data':''}">
+        <div class="ot-cal-day-num" style="color:${numColor};font-size:${numSize}">${label}</div>
+        ${kbBadge}
+        <input type="number" id="ot-inp-early-${ds}" class="ot-cal-inp early${ex&&ex.earlyH>0?' has-val':''}"
+          placeholder="早" step="0.25" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
+          oninput="otCalHighlight(this)">
+        <input type="number" id="ot-inp-ot-${ds}" class="ot-cal-inp ot${ex&&ex.hours>0?' has-val':''}"
+          placeholder="残" step="0.25" min="0" max="8" value="${ex&&ex.hours>0?ex.hours:''}"
+          oninput="otCalHighlight(this)">
+      </div>`;
+    }
+  });
+  html+='</div>';
   document.getElementById('ot-cal-content').innerHTML=html;
 }
 
@@ -2602,7 +2605,7 @@ function otCalHighlight(el){
 
 async function saveOtCal(){
   const empId=_otCalEmpId;
-  const memo=document.getElementById('ot-cal-memo').value.trim();
+  const memo='';
   const kubun=_otCalKubun;
   const earlyEls=document.querySelectorAll('[id^="ot-inp-early-"]');
   const otEls=document.querySelectorAll('[id^="ot-inp-ot-"]');
