@@ -2626,8 +2626,8 @@ function renderOtCalModal(){
         <div style="display:flex;align-items:center;gap:2px;width:100%">
           <span style="font-size:9px;color:#58a6ff;flex-shrink:0">早</span>
           <input type="number" id="ot-inp-early-${ds}" class="ot-cal-inp early${ex&&ex.earlyH>0?' has-val':''}" style="flex:1;min-width:0"
-            placeholder="0" step="1" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
-            oninput="otCalHighlight(this,'${ds}')">
+            placeholder="0" step="any" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
+            oninput="otCalHighlight(this,'${ds}')" onkeydown="earlyKeyStep(this,event,'${ds}')">
           ${earlyActStr}
         </div>
         <div style="display:flex;align-items:center;gap:2px;width:100%">
@@ -2652,12 +2652,48 @@ function otCalHighlight(el, ds){
   _updateCellStyle(ds);
 }
 
+// 早出入力: ↑ 0→1→1.25→1.5… (最初だけ1刻み、以降0.25刻み) ↓逆
+function earlyKeyStep(el, event, ds){
+  if(event.key!=='ArrowUp'&&event.key!=='ArrowDown') return;
+  event.preventDefault();
+  const cur=parseFloat(el.value)||0;
+  let next;
+  if(event.key==='ArrowUp'){
+    next= cur<1 ? 1 : Math.min(4, Math.round((cur+0.25)*100)/100);
+  } else {
+    next= cur<=1 ? 0 : Math.max(0, Math.round((cur-0.25)*100)/100);
+  }
+  el.value= next>0 ? next : '';
+  otCalHighlight(el, ds);
+}
+
 function toggleCellKubun(ds){
   const earlyEl=document.getElementById(`ot-inp-early-${ds}`);
   const otEl=document.getElementById(`ot-inp-ot-${ds}`);
-  const hasData=(parseFloat(earlyEl?.value)||0)>0||(parseFloat(otEl?.value)||0)>0;
+  const hasData=(earlyEl?.value!==''&&earlyEl?.value!=null)||(otEl?.value!==''&&otEl?.value!=null);
   if(!hasData&&!_otCalTouched.has(ds)) return; // 未入力の日はトグル不可
-  _otCalKubunMap[ds]=(_otCalKubunMap[ds]||'予定')==='予定'?'確定':'予定';
+  const newKubun=(_otCalKubunMap[ds]||'予定')==='予定'?'確定':'予定';
+  _otCalKubunMap[ds]=newKubun;
+  // 確定に切り替えた時: 打刻データから実績を予定欄に自動入力
+  if(newKubun==='確定'){
+    const empObj=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
+    const logs=dayRecs(ds,_otCalEmpId);
+    const st=logs&&logs.length?calcDay(logs,empObj):null;
+    if(st){
+      if(earlyEl&&st.earlyM!=null){
+        const v=Math.round(st.earlyM/60*100)/100;
+        earlyEl.value=v>0?v:'';
+        _otCalTouched.add(ds);
+        if(v>0) earlyEl.classList.add('has-val'); else earlyEl.classList.remove('has-val');
+      }
+      if(otEl&&st.lateM!=null){
+        const v=Math.round(st.lateM/60*100)/100;
+        otEl.value=v!==0?v:'';
+        _otCalTouched.add(ds);
+        if(v!==0) otEl.classList.add('has-val'); else otEl.classList.remove('has-val');
+      }
+    }
+  }
   _updateCellStyle(ds);
 }
 
