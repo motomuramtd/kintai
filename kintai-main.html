@@ -2674,23 +2674,25 @@ function toggleCellKubun(ds){
   if(!hasData&&!_otCalTouched.has(ds)) return; // 未入力の日はトグル不可
   const newKubun=(_otCalKubunMap[ds]||'予定')==='予定'?'確定':'予定';
   _otCalKubunMap[ds]=newKubun;
-  // 確定に切り替えた時: 打刻データから実績を予定欄に自動入力
+  // 確定に切り替えた時: 打刻の実績値を予定欄に上書き（予定＝実際の時間）
   if(newKubun==='確定'){
     const empObj=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
     const logs=dayRecs(ds,_otCalEmpId);
     const st=logs&&logs.length?calcDay(logs,empObj):null;
     if(st){
-      if(earlyEl&&st.earlyM!=null){
-        const v=Math.round(st.earlyM/60*100)/100;
-        earlyEl.value=v>0?v:'';
+      // 早出: 出勤打刻があれば実績をセット（0も含む）
+      if(earlyEl&&st.earlyM!==undefined&&st.earlyM!==null){
+        const v=+(st.earlyM/60).toFixed(2);
+        earlyEl.value=v;           // 実際の早出時間を予定欄へ（0もそのまま表示）
         _otCalTouched.add(ds);
-        if(v>0) earlyEl.classList.add('has-val'); else earlyEl.classList.remove('has-val');
+        earlyEl.classList.toggle('has-val', v>0);
       }
-      if(otEl&&st.lateM!=null){
-        const v=Math.round(st.lateM/60*100)/100;
-        otEl.value=v!==0?v:'';
+      // 残業: 退勤打刻があれば実績をセット（0・マイナスも含む）
+      if(otEl&&st.lateM!==undefined&&st.lateM!==null){
+        const v=+(st.lateM/60).toFixed(2);
+        otEl.value=v;              // 実際の残業時間を予定欄へ
         _otCalTouched.add(ds);
-        if(v!==0) otEl.classList.add('has-val'); else otEl.classList.remove('has-val');
+        otEl.classList.toggle('has-val', v!==0);
       }
     }
   }
@@ -2702,7 +2704,9 @@ function _updateCellStyle(ds){
   const badge=document.getElementById(`ot-kb-${ds}`);
   if(!cell) return;
   const earlyEl=cell.querySelector('.early'), otEl=cell.querySelector('.ot');
-  const hasVal=(earlyEl?.value!==''&&earlyEl?.value!=null)||(otEl?.value!==''&&otEl?.value!=null);
+  // 値が入力されている（0含む）かどうか判定
+  const earlyV=earlyEl?.value; const otV=otEl?.value;
+  const hasVal=(earlyV!==''&&earlyV!=null&&earlyV!==undefined)||(otV!==''&&otV!=null&&otV!==undefined);
   const isTouched=_otCalTouched.has(ds);
   const kb=_otCalKubunMap[ds]||'予定';
   const isKakutei=kb==='確定';
