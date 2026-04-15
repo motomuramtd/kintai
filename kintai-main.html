@@ -349,8 +349,8 @@
             <div class="card"><h3>出勤人数（直近稼働3日）</h3><div id="d-headcount-list" style="margin-top:4px"></div></div>
           </div>
           <!-- チャート -->
-          <div class="card-row" style="grid-template-columns:2fr 1fr">
-            <div class="chart-card">
+          <div class="card-row cols-3">
+            <div class="chart-card" style="grid-column:span 2">
               <h3>月次残業時間推移（当期12ヶ月・合計）</h3>
               <div class="chart-wrap" style="height:210px"><canvas id="ch-trend"></canvas></div>
             </div>
@@ -1195,12 +1195,13 @@ async function renderDashboard() {
     const hc = (totalM / (7.75 * 60)).toFixed(2);
     const dow=['日','月','火','水','木','金','土'][new Date(ds+'T00:00:00').getDay()];
     const label = ds.slice(5).replace('-','/') + `(${dow})`;
-    return `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;border-bottom:1px solid #21262d">
-      <span style="font-size:12px;color:#8b949e">${label}</span>
-      <span style="font-size:20px;font-weight:700;color:#3fb950;font-variant-numeric:tabular-nums">${hc}<span style="font-size:11px;color:#8b949e;margin-left:2px">人</span></span>
+    return `<div style="text-align:center;flex:1">
+      <div style="font-size:11px;color:#8b949e;margin-bottom:2px">${label}</div>
+      <div style="font-size:18px;font-weight:700;color:#3fb950;font-variant-numeric:tabular-nums">${hc}<span style="font-size:10px;color:#8b949e;margin-left:1px">人</span></div>
     </div>`;
   });
-  document.getElementById('d-headcount-list').innerHTML = hcRows.join('');
+  document.getElementById('d-headcount-list').innerHTML =
+    `<div style="display:flex;gap:4px;align-items:center;margin-top:6px">${hcRows.join('<div style="width:1px;background:#30363d;align-self:stretch;margin:0 2px"></div>')}</div>`;
 
   // チャート: 月次残業推移
   const tLabels=recent.map(p=>p.label);
