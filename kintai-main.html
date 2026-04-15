@@ -122,6 +122,29 @@
     .ot-bar{flex:0 0 200px;height:12px;background:#21262d;border-radius:4px;overflow:hidden}
     .ot-fill{height:100%;border-radius:4px}.ot-ok{background:#3fb950}.ot-warn{background:#d29922}.ot-danger{background:#f85149}
 
+    /* ===== 残業カレンダー登録 ===== */
+    .ot-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:4px}
+    .ot-cal-dow{text-align:center;font-size:10px;color:#8b949e;padding:4px 0;font-weight:700}
+    .ot-cal-cell{min-height:64px;padding:3px 2px;background:#21262d;border-radius:5px;display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid transparent}
+    .ot-cal-cell.ot-cal-off{background:#1a1f27;opacity:.5}
+    .ot-cal-cell.ot-cal-today{border-color:#58a6ff !important}
+    .ot-cal-cell.ot-cal-holiday{background:#2a1010;opacity:.6}
+    .ot-cal-cell.ot-cal-empty{background:transparent;border:none}
+    .ot-cal-cell.ot-cal-has-data{background:#1a2a1a;border-color:#27ae60}
+    .ot-cal-day-num{font-size:11px;font-weight:700;line-height:1;width:100%;text-align:center}
+    .ot-cal-inp{width:100%;background:transparent;border:none;border-bottom:1px solid #30363d;color:#e6edf3;font-size:10px;text-align:center;outline:none;padding:1px 0;-moz-appearance:textfield}
+    .ot-cal-inp::-webkit-outer-spin-button,.ot-cal-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+    .ot-cal-inp:focus{border-bottom-color:#58a6ff}
+    .ot-cal-inp.early{color:#58a6ff}
+    .ot-cal-inp.ot{color:#d29922}
+    .ot-cal-inp.has-val{background:rgba(255,255,255,.05)}
+    .ot-cal-label{font-size:8px;color:#6e7681;line-height:1}
+    .ot-cal-month-wrap{flex:1;min-width:260px}
+    .ot-cal-month-hdr{text-align:center;font-size:13px;font-weight:700;color:#cdd9e5;margin-bottom:8px}
+    .kubun-btn{padding:6px 20px;border-radius:20px;border:1px solid #30363d;background:#21262d;color:#8b949e;cursor:pointer;font-size:13px;font-weight:600;transition:all .12s}
+    .kubun-btn.active-yotei{background:#1a2a3a;border-color:#58a6ff;color:#58a6ff}
+    .kubun-btn.active-kakutei{background:#1a3a2a;border-color:#3fb950;color:#3fb950}
+
     /* ===== View toggle (個人詳細) ===== */
     .ind-view-btn{padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#8b949e;font-weight:600;transition:all .1s}
     .ind-view-btn.active{background:#1c3a6e;color:#58a6ff;border-color:#58a6ff}
@@ -473,6 +496,45 @@
       </div><!-- /content-body -->
     </div><!-- /content -->
   </div><!-- /app-layout -->
+</div>
+
+<!-- ===== 残業カレンダー登録モーダル ===== -->
+<div id="ot-cal-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:300;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:20px 22px;width:100%;max-width:860px;margin:auto">
+    <!-- ヘッダー -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <h3 style="font-size:16px;margin-bottom:2px">📋 残業登録</h3>
+        <div id="ot-cal-emp-label" style="font-size:12px;color:#8b949e"></div>
+      </div>
+      <button onclick="document.getElementById('ot-cal-modal').style.display='none'"
+        style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer;line-height:1;padding:4px">✕</button>
+    </div>
+    <!-- 区分 + メモ -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:12px;color:#8b949e;flex-shrink:0">区分</span>
+      <button id="ot-kubun-yotei" class="kubun-btn active-yotei" onclick="setOtKubun('予定')">予定</button>
+      <button id="ot-kubun-kakutei" class="kubun-btn" onclick="setOtKubun('確定')">確定</button>
+      <span style="font-size:12px;color:#8b949e;margin-left:12px;flex-shrink:0">メモ</span>
+      <input type="text" id="ot-cal-memo" placeholder="任意"
+        style="flex:1;min-width:120px;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:6px 10px;border-radius:6px;font-size:12px">
+      <span style="font-size:10px;color:#6e7681;white-space:nowrap">🔵早出(h)　🟡残業(h)</span>
+    </div>
+    <!-- 月ナビ -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <button class="pb-btn" onclick="changeOtCalMonth(-1)">◀</button>
+      <span id="ot-cal-nav-label" style="font-size:13px;font-weight:700;color:#cdd9e5;min-width:160px;text-align:center"></span>
+      <button class="pb-btn" onclick="changeOtCalMonth(1)">▶</button>
+    </div>
+    <!-- カレンダー本体（2ヶ月） -->
+    <div id="ot-cal-content" style="display:flex;gap:16px;flex-wrap:wrap"></div>
+    <!-- 保存ボタン -->
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="saveOtCal()" style="flex:1;background:#238636;border:none;color:#fff;padding:11px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">保存</button>
+      <button onclick="document.getElementById('ot-cal-modal').style.display='none'"
+        style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:11px;border-radius:8px;cursor:pointer">キャンセル</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== 有休・残業・休暇 登録モーダル（全ページ共通・静的配置）===== -->
@@ -1067,7 +1129,7 @@ async function initKintaiMgmt(spCfg) {
     }
     await ensureKSheet('会社カレンダー',['日付','種別','メモ']);
     await ensureKSheet('有休管理',['社員ID','月度','日付','種別','メモ']);
-    await ensureKSheet('残業予定',['社員ID','月度','日付','予定残業(h)','メモ','予定早出(h)']);
+    await ensureKSheet('残業予定',['社員ID','月度','日付','予定残業(h)','メモ','予定早出(h)','区分']);
     await ensureKSheet('休暇管理',['社員ID','開始日','終了日','理由','メモ']);
     await loadKC();
   } catch(e){ console.warn('勤怠管理システム.xlsx初期化スキップ:',e.message||e); }
@@ -1092,13 +1154,13 @@ async function loadKC() {
   const d2s=excelSerialToDateStr; // 日付変換ヘルパー（数値シリアル値 or 文字列どちらも対応）
   KC.calendar=cal.map(r=>({date:d2s(r[0]),type:String(r[1]||''),memo:String(r[2]||'')}));
   KC.leaves=lv.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:d2s(r[2]),type:String(r[3]||''),memo:String(r[4]||'')}));
-  KC.otPlans=op.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:d2s(r[2]),hours:parseFloat(r[3])||0,memo:String(r[4]||''),earlyH:parseFloat(r[5])||0}));
+  KC.otPlans=op.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:d2s(r[2]),hours:parseFloat(r[3])||0,memo:String(r[4]||''),earlyH:parseFloat(r[5])||0,kubun:String(r[6]||'予定')}));
   KC.vacations=vac.map(r=>({id:String(r[0]).padStart(4,'0'),startDate:d2s(r[1]),endDate:d2s(r[2]),reason:String(r[3]||''),memo:String(r[4]||'')}));
   KC.loaded=true;
 }
 
 async function saveKSheet(sheet, rows) {
-  const headers={'会社カレンダー':['日付','種別','メモ'],'有休管理':['社員ID','月度','日付','種別','メモ'],'残業予定':['社員ID','月度','日付','予定残業(h)','メモ','予定早出(h)'],'休暇管理':['社員ID','開始日','終了日','理由','メモ']}[sheet];
+  const headers={'会社カレンダー':['日付','種別','メモ'],'有休管理':['社員ID','月度','日付','種別','メモ'],'残業予定':['社員ID','月度','日付','予定残業(h)','メモ','予定早出(h)','区分'],'休暇管理':['社員ID','開始日','終了日','理由','メモ']}[sheet];
   const nc=headers.length;
   const ec=String.fromCharCode(64+nc);
 
@@ -2229,6 +2291,7 @@ function renderLpContent(empId){
       const earlyPlan=l.earlyH||0;
       return `<tr>
         <td>${l.date}</td>
+        <td><span class="tag" style="background:${l.kubun==='確定'?'#1a3a2a':'#1a2545'};color:${l.kubun==='確定'?'#3fb950':'#58a6ff'};font-size:10px">${l.kubun||'予定'}</span></td>
         <td class="r" style="color:#d29922">${l.hours}h</td>
         <td class="r">${actualOtStr}</td>
         <td class="r" style="color:#79c0ff">${earlyPlan>0?earlyPlan+'h':'—'}</td>
@@ -2285,10 +2348,10 @@ function renderLpContent(empId){
         <div class="tbl-card">
           <div class="tbl-hdr">
             <h3>📋 残業予定</h3>
-            <button class="btn-export" onclick="openAddOtPlanDirect('${empId}')">＋ 追加</button>
+            <button class="btn-export" onclick="openOtCalModal('${empId}')">📅 カレンダー登録</button>
           </div>
           <table class="tbl">
-            <thead><tr><th>日付</th><th>残業予定</th><th>残業実績</th><th>早出予定</th><th>早出実績</th><th>メモ</th><th></th></tr></thead>
+            <thead><tr><th>日付</th><th>区分</th><th>残業予定</th><th>残業実績</th><th>早出予定</th><th>早出実績</th><th>メモ</th><th></th></tr></thead>
             <tbody>${planRows}</tbody>
           </table>
         </div>
@@ -2412,7 +2475,7 @@ async function saveLeave(){
     }
     if(conflictOts.length>0){
       KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
-      try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); }catch(e){}
+      try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0,l.kubun||'予定'])); }catch(e){}
     }
   }
 
@@ -2444,9 +2507,132 @@ function quickRegLeave(empId){
   _lpCurEmpId=empId;
   openAddLeave(empId);
 }
+// ── 残業カレンダー登録 ───────────────────────────────────────────
+let _otCalEmpId='', _otCalKubun='予定', _otCalYear1=0, _otCalMonth1=0;
+
+function openOtCalModal(empId){
+  _otCalEmpId=empId; _lpCurEmpId=empId;
+  const now=new Date();
+  _otCalYear1=now.getFullYear(); _otCalMonth1=now.getMonth()+1; _otCalKubun='予定';
+  const emp=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
+  document.getElementById('ot-cal-emp-label').textContent=emp?`${emp.name}（${emp.group||'—'}）`:'';
+  document.getElementById('ot-cal-memo').value='';
+  setOtKubun('予定');
+  renderOtCalModal();
+  document.getElementById('ot-cal-modal').style.display='flex';
+}
+
+function setOtKubun(v){
+  _otCalKubun=v;
+  const y=document.getElementById('ot-kubun-yotei');
+  const k=document.getElementById('ot-kubun-kakutei');
+  if(y&&k){
+    y.className='kubun-btn'+(v==='予定'?' active-yotei':'');
+    k.className='kubun-btn'+(v==='確定'?' active-kakutei':'');
+  }
+}
+
+function changeOtCalMonth(delta){
+  _otCalMonth1+=delta;
+  if(_otCalMonth1<1){_otCalYear1--;_otCalMonth1=12;}
+  if(_otCalMonth1>12){_otCalYear1++;_otCalMonth1=1;}
+  renderOtCalModal();
+}
+
+function renderOtCalModal(){
+  const today=new Date().toLocaleDateString('sv');
+  const DOWS=['日','月','火','水','木','金','土'];
+  const m2=_otCalMonth1===12?1:_otCalMonth1+1;
+  const y2=_otCalMonth1===12?_otCalYear1+1:_otCalYear1;
+  const months=[{y:_otCalYear1,m:_otCalMonth1},{y:y2,m:m2}];
+  document.getElementById('ot-cal-nav-label').textContent=
+    `${_otCalYear1}年${_otCalMonth1}月 ・ ${y2}年${m2}月`;
+  const existing={};
+  KC.otPlans.filter(l=>l.id===_otCalEmpId).forEach(l=>{existing[l.date]=l;});
+  let html='';
+  months.forEach(({y,m})=>{
+    const ym=`${y}-${String(m).padStart(2,'0')}`;
+    const firstDow=new Date(y,m-1,1).getDay();
+    const lastDate=new Date(y,m,0).getDate();
+    html+=`<div class="ot-cal-month-wrap">
+      <div class="ot-cal-month-hdr">${y}年${m}月</div>
+      <div class="ot-cal-grid">`;
+    DOWS.forEach((d,i)=>{
+      html+=`<div class="ot-cal-dow" style="color:${i===0?'#f85149':i===6?'#58a6ff':'#8b949e'}">${d}</div>`;
+    });
+    for(let i=0;i<firstDow;i++) html+='<div class="ot-cal-cell ot-cal-empty"></div>';
+    for(let d=1;d<=lastDate;d++){
+      const ds=`${ym}-${String(d).padStart(2,'0')}`;
+      const dow=new Date(ds+'T00:00:00').getDay();
+      const isHol=isHolidayDate(ds);
+      const isToday=ds===today;
+      const ex=existing[ds];
+      const numColor=dow===0?'#f85149':dow===6?'#58a6ff':isToday?'#58a6ff':'#cdd9e5';
+      if(isHol){
+        html+=`<div class="ot-cal-cell ot-cal-off"><div class="ot-cal-day-num" style="color:${numColor}">${d}</div></div>`;
+      } else {
+        const hasData=ex&&(ex.earlyH>0||ex.hours>0);
+        const kb=ex?ex.kubun||'予定':'';
+        const kbBadge=kb?`<div style="font-size:7px;color:${kb==='確定'?'#3fb950':'#58a6ff'};line-height:1.2">${kb}</div>`:'';
+        html+=`<div class="ot-cal-cell${isToday?' ot-cal-today':''}${hasData?' ot-cal-has-data':''}">
+          <div class="ot-cal-day-num" style="color:${numColor}">${d}</div>
+          ${kbBadge}
+          <input type="number" id="ot-inp-early-${ds}" class="ot-cal-inp early${ex&&ex.earlyH>0?' has-val':''}"
+            placeholder="早" step="0.25" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
+            oninput="otCalHighlight(this)">
+          <input type="number" id="ot-inp-ot-${ds}" class="ot-cal-inp ot${ex&&ex.hours>0?' has-val':''}"
+            placeholder="残" step="0.25" min="0" max="8" value="${ex&&ex.hours>0?ex.hours:''}"
+            oninput="otCalHighlight(this)">
+        </div>`;
+      }
+    }
+    html+='</div></div>';
+  });
+  document.getElementById('ot-cal-content').innerHTML=html;
+}
+
+function otCalHighlight(el){
+  if(parseFloat(el.value)>0) el.classList.add('has-val');
+  else el.classList.remove('has-val');
+  const cell=el.closest('.ot-cal-cell');
+  if(!cell) return;
+  const earlyEl=cell.querySelector('.early'), otEl=cell.querySelector('.ot');
+  cell.classList.toggle('ot-cal-has-data',(parseFloat(earlyEl?.value)||0)>0||(parseFloat(otEl?.value)||0)>0);
+}
+
+async function saveOtCal(){
+  const empId=_otCalEmpId;
+  const memo=document.getElementById('ot-cal-memo').value.trim();
+  const kubun=_otCalKubun;
+  const earlyEls=document.querySelectorAll('[id^="ot-inp-early-"]');
+  const otEls=document.querySelectorAll('[id^="ot-inp-ot-"]');
+  const updates={};
+  earlyEls.forEach(inp=>{
+    const ds=inp.id.replace('ot-inp-early-','');
+    if(!updates[ds]) updates[ds]={earlyH:0,hours:0};
+    updates[ds].earlyH=parseFloat(inp.value)||0;
+  });
+  otEls.forEach(inp=>{
+    const ds=inp.id.replace('ot-inp-ot-','');
+    if(!updates[ds]) updates[ds]={earlyH:0,hours:0};
+    updates[ds].hours=parseFloat(inp.value)||0;
+  });
+  const shownDates=new Set(Object.keys(updates));
+  KC.otPlans=KC.otPlans.filter(l=>!(l.id===empId&&shownDates.has(l.date)));
+  Object.entries(updates).forEach(([date,{earlyH,hours}])=>{
+    if(earlyH>0||hours>0) KC.otPlans.push({id:empId,ym:date.slice(0,7),date,hours,earlyH,memo,kubun});
+  });
+  document.getElementById('ot-cal-modal').style.display='none';
+  try{
+    await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0,l.kubun||'予定']));
+    toast('📋 残業を登録しました');
+  }catch(e){ alert('保存エラー: '+e.message); }
+  _refreshAfterReg();
+}
+
 function quickRegOtPlan(empId){
   _lpCurEmpId=empId;
-  openAddOtPlanDirect(empId);
+  openOtCalModal(empId);
 }
 function quickRegVacation(empId){
   _lpCurEmpId=empId;
@@ -2486,7 +2672,7 @@ async function saveOtPlan(){
   KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date===date));
   KC.otPlans.push({id:_lpCurEmpId,ym:date.slice(0,7),date,hours,memo,earlyH});
   document.getElementById('lp-plan-modal').style.display='none';
-  try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); toast('📋 残業予定を登録しました'); }
+  try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0,l.kubun||'予定'])); toast('📋 残業予定を登録しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
   _refreshAfterReg();
 }
@@ -2494,7 +2680,7 @@ async function saveOtPlan(){
 async function deleteOtPlan(empId,ym,date){
   if(!confirm(`${date} の残業予定を削除しますか？`))return;
   KC.otPlans=KC.otPlans.filter(l=>!(l.id===empId&&l.date===date));
-  try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); toast('🗑 削除しました'); }
+  try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0,l.kubun||'予定'])); toast('🗑 削除しました'); }
   catch(e){ alert('削除エラー: '+e.message); }
   renderLpContent(empId);
 }
@@ -2546,7 +2732,7 @@ async function saveVacation(){
     const lines=conflictOts.map(l=>`■ 残業予定: ${l.date}（残業${l.hours}h${l.earlyH>0?` / 早出${l.earlyH}h`:''}）`).join('\n');
     if(!confirm(`以下の残業予定の登録があります。削除して休暇を登録しますか？\n\n${lines}`)) return;
     KC.otPlans=KC.otPlans.filter(l=>!(l.id===_lpCurEmpId&&l.date>=startDate&&l.date<=endDate));
-    try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); }catch(e){}
+    try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0,l.kubun||'予定'])); }catch(e){}
   }
 
   // 同一社員・同一開始日は上書き
