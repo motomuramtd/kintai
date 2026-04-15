@@ -315,9 +315,6 @@
         <div class="nav-item" data-page="calendar" onclick="showPage('calendar')">
           <span class="nav-icon">📅</span><span>会社カレンダー</span>
         </div>
-        <div class="nav-item" data-page="leave-plan" onclick="showPage('leave-plan')">
-          <span class="nav-icon">🗓️</span><span>有休・残業予定</span>
-        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-user">
@@ -420,10 +417,9 @@
               <div id="rank-chart" style="margin-top:8px"></div>
             </div>
             <div class="tbl-card" style="max-height:340px;display:flex;flex-direction:column">
-              <div class="tbl-hdr"><h3>⚠️ アラート一覧（70%以上）</h3></div>
-              <div style="overflow-y:auto;flex:1">
-                <table class="tbl"><thead><tr><th>氏名</th><th>G</th><th class="r">残業時間</th><th>状況</th></tr></thead>
-                <tbody id="ot-alert-tbody"></tbody></table>
+              <div class="tbl-hdr"><h3>📝 有休・休暇・残業 登録</h3></div>
+              <div id="ot-emp-reg-list" style="overflow-y:auto;flex:1;padding:4px 0">
+                <div style="text-align:center;padding:20px;color:#8b949e">読み込み中...</div>
               </div>
             </div>
           </div>
@@ -431,7 +427,7 @@
             <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
             <div style="overflow-x:auto">
               <table class="tbl">
-                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
+                <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r" style="color:#ff8040">休日出勤</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
                 <tbody id="ot-detail-tbody"></tbody>
               </table>
             </div>
@@ -498,6 +494,86 @@
       </div><!-- /content-body -->
     </div><!-- /content -->
   </div><!-- /app-layout -->
+</div>
+
+<!-- ===== 有休・残業・休暇 登録モーダル（全ページ共通・静的配置）===== -->
+<div id="lp-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:380px;max-width:95vw">
+    <h3 style="margin-bottom:16px">🌴 有休登録</h3>
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
+    <input type="date" id="lp-lv-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:12px">
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:8px">種別</label>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="lv-type" value="1日" checked onchange="lpLvTypeChange()"><span>1日</span></label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="lv-type" value="半休AM" onchange="lpLvTypeChange()"><span>半日（午前）</span></label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="lv-type" value="半休PM" onchange="lpLvTypeChange()"><span>半日（午後）</span></label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="lv-type" value="時間" onchange="lpLvTypeChange()"><span>時間単位</span></label>
+    </div>
+    <div id="lp-lv-time-row" style="display:none;margin-bottom:12px;background:#0d1117;border-radius:8px;padding:10px">
+      <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">時間帯（1分単位）</label>
+      <div style="font-size:10px;color:#6e7681;margin-bottom:6px">有効範囲: 8:30〜12:00 または 12:45〜17:00　※昼休憩(12:00〜12:45)は計算から除外</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="time" id="lp-lv-st" value="08:30" min="08:30" max="17:00" step="60"
+          style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
+        <span style="color:#8b949e;font-weight:700">〜</span>
+        <input type="time" id="lp-lv-en" value="09:30" min="08:30" max="17:00" step="60"
+          style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
+      </div>
+      <div id="lp-lv-hours-preview" style="font-size:12px;color:#79c0ff;margin-top:6px;text-align:center;font-weight:600"></div>
+    </div>
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ（任意）</label>
+    <input type="text" id="lp-lv-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px" placeholder="">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveLeave()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
+      <button onclick="document.getElementById('lp-leave-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<div id="lp-vac-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:420px;max-width:95vw">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3>🏖 休暇登録</h3>
+      <button onclick="document.getElementById('lp-vac-modal').style.display='none'" style="background:none;border:none;color:#8b949e;font-size:20px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">開始日</label>
+        <input type="date" id="lp-vac-start" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px"></div>
+      <div><label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">終了日</label>
+        <input type="date" id="lp-vac-end" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px"></div>
+    </div>
+    <div id="lp-vac-days-preview" style="font-size:12px;color:#d0a0ff;text-align:center;margin-bottom:10px;min-height:16px"></div>
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">休暇理由</label>
+    <select id="lp-vac-reason" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:9px 8px;border-radius:6px;margin-bottom:12px;font-size:13px">
+      <option value="一時帰国">一時帰国</option><option value="病気休暇">病気休暇</option>
+      <option value="育児休業">育児休業</option><option value="産前・産後休業">産前・産後休業</option>
+      <option value="介護休業">介護休業</option><option value="その他">その他</option>
+    </select>
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ（任意）</label>
+    <input type="text" id="lp-vac-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px" placeholder="">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveVacation()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
+      <button onclick="document.getElementById('lp-vac-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<div id="lp-plan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:360px;max-width:95vw">
+    <h3 style="margin-bottom:16px">📋 残業予定登録</h3>
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
+    <input type="date" id="lp-plan-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">予定残業時間（h）</label>
+    <input type="number" id="lp-plan-hours" min="0" max="8" step="0.25" value="1" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">予定早出時間（h）</label>
+    <input type="number" id="lp-plan-early" min="0" max="4" step="0.25" value="0" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
+    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ</label>
+    <input type="text" id="lp-plan-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveOtPlan()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
+      <button onclick="document.getElementById('lp-plan-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -781,6 +857,7 @@ function aggPeriod(empId, start, end) {
   // シフト情報を社員マスタから取得（シフト勤務対応）
   const emp = (typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
   let days=0, workM=0, otM=0, earlyM=0, lateM=0, lateArrM=0, earlyLeaveM=0, absM=0;
+  let holidayWorkDays=0, holidayWorkM=0; // 休日出勤（土日・祝日・会社休日）
   let d=new Date(start+'T00:00:00'), ed=new Date(end+'T00:00:00');
   while (d<=ed) {
     const ds=d.toLocaleDateString('sv');
@@ -790,13 +867,15 @@ function aggPeriod(empId, start, end) {
       earlyM+=st.earlyM||0; lateM+=st.lateM||0;
       lateArrM+=st.lateArrM||0; earlyLeaveM+=st.earlyLeaveM||0;
       absM+=st.absM||0;
+      // 休日出勤（土日・祝日・会社休日のみ。臨時休業・計画有休は通常出勤扱い）
+      if(getWorkType(ds)==='holiday') { holidayWorkDays++; holidayWorkM+=st.workM; }
     } else if (logs.some(r=>r.type==='出勤') && !st?.isPreworkAbsent) {
       // 退勤未打刻は出勤日扱い。始業前退勤（体調不良等）は欠勤なのでカウントしない
       days++;
     }
     d.setDate(d.getDate()+1);
   }
-  return { days, workM, otM, earlyM, lateM, lateArrM, earlyLeaveM, absM };
+  return { days, workM, otM, earlyM, lateM, lateArrM, earlyLeaveM, absM, holidayWorkDays, holidayWorkM };
 }
 
 // ================================================================
@@ -881,6 +960,29 @@ function isHolidayDate(ds) {
   return s==='sunday'||s==='saturday'
        ||s==='臨時休業'||s==='計画有休'
        ||s==='休日'||s==='特別'||s==='holiday'||s==='祝日';
+}
+/**
+ * 打刻があった場合の出勤種別を返す
+ * @returns {'holiday'|'rinkyuu'|'keikaku'|'normal'}
+ *   holiday  = 休日出勤（土日・祝日・会社指定休日）
+ *   rinkyuu  = 臨時休業日出勤（通常出勤扱い）
+ *   keikaku  = 計画有休日出勤（通常出勤扱い）
+ *   normal   = 通常出勤
+ */
+function getWorkType(ds){
+  const s=calDayState(ds);
+  if(s==='臨時休業') return 'rinkyuu';
+  if(s==='計画有休') return 'keikaku';
+  if(s==='sunday'||s==='saturday'||s==='休日'||s==='kyuujitsu'||
+     s==='特別'||s==='holiday'||s==='祝日') return 'holiday';
+  return 'normal';
+}
+// 出勤種別のラベル・スタイルを返す
+function workTypeTag(wt){
+  if(wt==='holiday') return {label:'休日出勤', bg:'#4a2000', color:'#ff8040', borderColor:'#a04010'};
+  if(wt==='rinkyuu') return {label:'通常出勤', sub:'臨時休業日', bg:'#2a1e00', color:'#d29922', borderColor:'#604800'};
+  if(wt==='keikaku') return {label:'通常出勤', sub:'計画有休日', bg:'#0a2010', color:'#3fb950', borderColor:'#206030'};
+  return {label:'出勤', bg:'#1a3a2a', color:'#3fb950', borderColor:'#27ae60'};
 }
 // YYYY-MM-DD 配列を生成（月の全日）
 function monthDates(y,m) {
@@ -1331,17 +1433,21 @@ async function renderOvertimePage() {
   document.getElementById('ot-avg').textContent=`平均 ${m2hm(Math.round(totalOt/filteredStats.length))} / 人`;
   document.getElementById('ot-over').textContent=overCnt;
 
-  // アラートリスト（70%以上）
-  const alerts=[...filteredStats].filter(e=>e.otM>=otLimit*.7).sort((a,b)=>b.otM-a.otM);
-  document.getElementById('ot-alert-tbody').innerHTML=alerts.length?alerts.map(e=>{
-    const cls=e.otM>=otLimit?'t-danger':'t-warn';
-    return `<tr>
-      <td><strong>${e.name}</strong></td>
-      <td><span class="gbadge">${e.group||'—'}</span></td>
-      <td class="r ${e.otM>=otLimit?'c-danger-cell':'c-warn-cell'}">${m2hm(e.otM)}</td>
-      <td><span class="tag ${cls}">${e.otM>=otLimit?'超過':'注意'}</span></td>
-    </tr>`;
-  }).join(''):'<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:16px">アラートなし ✅</td></tr>';
+  // ── 有休・休暇・残業 登録ボタンリスト（残業時間チャートと同じ社員ID順）──
+  const regList=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
+  document.getElementById('ot-emp-reg-list').innerHTML=regList.length
+    ?regList.map(e=>`
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid #1c2128;flex-wrap:wrap">
+        <div style="min-width:80px;font-size:12px;font-weight:700;color:#cdd9e5;white-space:nowrap">${e.name}</div>
+        <span class="gbadge" style="font-size:10px">${e.group||'—'}</span>
+        <button onclick="quickRegLeave('${e.id}')"
+          style="background:#1a3a2a;border:1px solid #27ae60;color:#3fb950;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🌴 有休登録</button>
+        <button onclick="quickRegOtPlan('${e.id}')"
+          style="background:#1a2a1a;border:1px solid #d29922;color:#d29922;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">📋 残業登録</button>
+        <button onclick="quickRegVacation('${e.id}')"
+          style="background:#2a1040;border:1px solid #9b59b6;color:#d0a0ff;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🏖 休暇登録</button>
+      </div>`).join('')
+    :'<div style="text-align:center;padding:20px;color:#8b949e">社員データなし</div>';
 
   // 全員詳細（残業時間（時間）チャートと同じ社員ID順）
   const sorted=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
@@ -1355,6 +1461,7 @@ async function renderOvertimePage() {
       <td><span class="gbadge">${e.group||'—'}</span></td>
       <td style="color:#a78bfa;font-size:11px">${e.shift||'—'}</td>
       <td class="r">${e.days}日</td>
+      <td class="r" style="color:#ff8040">${e.holidayWorkDays>0?`${e.holidayWorkDays}日`:'—'}</td>
       <td class="r">${e.workM>0?m2hm(e.workM):'—'}</td>
       <td class="r" style="color:#f39c12">${e.absM>0?m2hm(e.absM):'—'}</td>
       <td class="r" style="color:#58a6ff">${e.earlyM>0?m2hm(e.earlyM):'—'}</td>
@@ -1466,7 +1573,7 @@ async function renderIndividualPage() {
         </div>
       </div>
       <table class="tbl">
-        <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
+        <thead><tr><th>月度</th><th>集計期間</th><th class="r">出勤日数</th><th class="r" style="color:#ff8040">休日出勤</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>上限比</th><th>状況</th></tr></thead>
         <tbody>`;
     pst.forEach(p=>{
       const cls=p.otM>=otLimit?'danger':p.otM>=otLimit*.8?'warn':'ok';
@@ -1476,6 +1583,7 @@ async function renderIndividualPage() {
         <td style="font-weight:600">${p.label}</td>
         <td style="color:#8b949e;font-size:11px">${p.tip}</td>
         <td class="r">${p.days>0?p.days+'日':'—'}</td>
+        <td class="r" style="color:#ff8040">${p.holidayWorkDays>0?`${p.holidayWorkDays}日`:'—'}</td>
         <td class="r">${p.workM>0?m2hm(p.workM):'—'}</td>
         <td class="r" style="color:#f39c12">${p.absM>0?m2hm(p.absM):'—'}</td>
         <td class="r" style="color:#58a6ff">${p.earlyM>0?m2hm(p.earlyM):'—'}</td>
@@ -1579,16 +1687,46 @@ async function renderIndividualPage() {
     }
 
     if(offDay){
-      // 休日行
       const calState=calDayState(ds);
-      const offLabel=calState==='臨時休業'?'臨時休業':calState==='計画有休'?'計画有休':dow===0?'日曜':dow===6?'土曜':'休日';
+      const wt=getWorkType(ds);
+      const wtTag=workTypeTag(wt);
       const jpN=jpHolidays[ds]?` (${jpHolidays[ds]})`:'';
-      html+=`<tr class="day-row-off" style="${todaySty}">
-        <td style="color:${isToday?'#58a6ff':'#8b949e'}">${dateLabel}</td>
-        <td style="color:${dowColor}">${dowLabel}</td>
-        <td colspan="11" style="text-align:center;color:#4a5060">${hasPunch&&st?`${st.inT||'—'} → ${st.outT||'未退勤'}（出勤記録あり）`:`${offLabel}${jpN}`}</td>
-        <td>${hasPunch?'<span class="tag t-warn">出勤</span>':'<span class="tag t-muted">休日</span>'}</td>
-      </tr>`;
+
+      if(hasPunch && st && st.workM!==null){
+        // ── 休日/臨時/計画有休での出勤 → 種別に応じた出勤行を表示 ──
+        const outs=st.outings||[];
+        const o1=outs[0]||null, o2=outs[1]||null;
+        const otCls=st.otM>=(otLimit||45*60)?'danger':st.otM>=(otLimit||45*60)*.8?'warn':'ok';
+        const lateCell=st.lateArrM>0?`<td class="r" style="color:#f0a030">${m2hm(st.lateArrM)}</td>`:`<td class="r c-muted">—</td>`;
+        const elCell=st.earlyLeaveM>0?`<td class="r" style="color:#e67e22">${m2hm(st.earlyLeaveM)}</td>`:`<td class="r c-muted">—</td>`;
+        const goStyle='color:#f39c12', backStyle='color:#27ae60';
+        const tagHtml=`<span class="tag" style="background:${wtTag.bg};color:${wtTag.color};border:1px solid ${wtTag.borderColor};display:inline-block;line-height:1.3">${wtTag.label}${wtTag.sub?`<br><span style="font-size:8px;opacity:.8">${wtTag.sub}</span>`:''}</span>`;
+        html+=`<tr style="${todaySty};background:${wt==='holiday'?'#1a0e04':wt==='rinkyuu'?'#100e02':'#02100a'}">
+          <td style="color:${isToday?'#58a6ff':wtTag.color}">${dateLabel}</td>
+          <td style="color:${dowColor}">${dowLabel}</td>
+          <td class="r">${st.inT}</td>
+          <td class="r" style="${goStyle}">${o1?o1.go:'<span style="color:#4a5060">—</span>'}</td>
+          <td class="r" style="${backStyle}">${o1?(o1.back||'<span style="color:#f85149">外出中</span>'):'<span style="color:#4a5060">—</span>'}</td>
+          <td class="r" style="${goStyle}">${o2?o2.go:'<span style="color:#4a5060">—</span>'}</td>
+          <td class="r" style="${backStyle}">${o2?(o2.back||'<span style="color:#f85149">外出中</span>'):'<span style="color:#4a5060">—</span>'}</td>
+          <td class="r">${st.outT||'<span style="color:#f85149">退勤未</span>'}</td>
+          <td class="r">${m2hm(st.workM)}</td>
+          <td class="r" style="color:#58a6ff">${st.earlyM>0?m2hm(st.earlyM):'—'}</td>
+          <td class="r ${otCls!=='ok'?'c-'+otCls+'-cell':''}">${st.lateM>0?m2hm(st.lateM):'—'}</td>
+          ${lateCell}${elCell}
+          <td>${tagHtml}</td>
+        </tr>`;
+      } else {
+        // 休日行（打刻なし）
+        const offLabel=calState==='臨時休業'?'臨時休業':calState==='計画有休'?'計画有休':dow===0?'日曜':dow===6?'土曜':'休日';
+        const punchNote=hasPunch&&st?`${st.inT||'—'} → ${st.outT||'未退勤'}（打刻のみ）`:`${offLabel}${jpN}`;
+        html+=`<tr class="day-row-off" style="${todaySty}">
+          <td style="color:${isToday?'#58a6ff':'#8b949e'}">${dateLabel}</td>
+          <td style="color:${dowColor}">${dowLabel}</td>
+          <td colspan="11" style="text-align:center;color:#4a5060">${punchNote}</td>
+          <td>${hasPunch?'<span class="tag t-warn">出勤</span>':'<span class="tag t-muted">休日</span>'}</td>
+        </tr>`;
+      }
     } else if(st && st.isPreworkAbsent){
       // 始業前退勤 → 欠勤（打刻時間を表示）
       html+=`<tr style="${todaySty};background:#1e1010">
@@ -2149,116 +2287,18 @@ function renderLpContent(empId){
           </table>
         </div>
       </div>
-    </div>
-
-    <!-- 有休登録モーダル -->
-    <div id="lp-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:380px;max-width:95vw">
-        <h3 style="margin-bottom:16px">🌴 有休登録</h3>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
-        <input type="date" id="lp-lv-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:12px">
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:8px">種別</label>
-        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-            <input type="radio" name="lv-type" value="1日" checked onchange="lpLvTypeChange()"><span>1日</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-            <input type="radio" name="lv-type" value="半休AM" onchange="lpLvTypeChange()"><span>半日（午前）</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-            <input type="radio" name="lv-type" value="半休PM" onchange="lpLvTypeChange()"><span>半日（午後）</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-            <input type="radio" name="lv-type" value="時間" onchange="lpLvTypeChange()"><span>時間単位</span>
-          </label>
-        </div>
-        <div id="lp-lv-time-row" style="display:none;margin-bottom:12px;background:#0d1117;border-radius:8px;padding:10px">
-          <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">時間帯（1分単位）</label>
-          <div style="font-size:10px;color:#6e7681;margin-bottom:6px">有効範囲: 8:30〜12:00 または 12:45〜17:00　※昼休憩(12:00〜12:45)は計算から除外</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="time" id="lp-lv-st" value="08:30" min="08:30" max="17:00" step="60"
-              style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
-            <span style="color:#8b949e;font-weight:700">〜</span>
-            <input type="time" id="lp-lv-en" value="09:30" min="08:30" max="17:00" step="60"
-              style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;flex:1;font-size:14px">
-          </div>
-          <div id="lp-lv-hours-preview" style="font-size:12px;color:#79c0ff;margin-top:6px;text-align:center;font-weight:600"></div>
-        </div>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ（任意）</label>
-        <input type="text" id="lp-lv-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px" placeholder="">
-        <div style="display:flex;gap:8px">
-          <button onclick="saveLeave()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
-          <button onclick="document.getElementById('lp-leave-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 休暇登録モーダル -->
-    <div id="lp-vac-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:420px;max-width:95vw">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h3>🏖 休暇登録</h3>
-          <button onclick="document.getElementById('lp-vac-modal').style.display='none'"
-            style="background:none;border:none;color:#8b949e;font-size:20px;cursor:pointer;line-height:1">✕</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div>
-            <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">開始日</label>
-            <input type="date" id="lp-vac-start"
-              style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px">
-          </div>
-          <div>
-            <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">終了日</label>
-            <input type="date" id="lp-vac-end"
-              style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px">
-          </div>
-        </div>
-        <div id="lp-vac-days-preview" style="font-size:12px;color:#d0a0ff;text-align:center;margin-bottom:10px;min-height:16px"></div>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">休暇理由</label>
-        <select id="lp-vac-reason"
-          style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:9px 8px;border-radius:6px;margin-bottom:12px;font-size:13px">
-          <option value="一時帰国">一時帰国</option>
-          <option value="病気休暇">病気休暇</option>
-          <option value="育児休業">育児休業</option>
-          <option value="産前・産後休業">産前・産後休業</option>
-          <option value="介護休業">介護休業</option>
-          <option value="その他">その他</option>
-        </select>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ（任意）</label>
-        <input type="text" id="lp-vac-memo"
-          style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px" placeholder="">
-        <div style="display:flex;gap:8px">
-          <button onclick="saveVacation()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
-          <button onclick="document.getElementById('lp-vac-modal').style.display='none'"
-            style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 残業予定登録モーダル -->
-    <div id="lp-plan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:360px;max-width:95vw">
-        <h3 style="margin-bottom:16px">📋 残業予定登録</h3>
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">日付</label>
-        <input type="date" id="lp-plan-date" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">予定残業時間（h）</label>
-        <input type="number" id="lp-plan-hours" min="0" max="8" step="0.25" value="1" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">予定早出時間（h）</label>
-        <input type="number" id="lp-plan-early" min="0" max="4" step="0.25" value="0" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:10px">
-        <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">メモ</label>
-        <input type="text" id="lp-plan-memo" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px;border-radius:6px;margin-bottom:16px">
-        <div style="display:flex;gap:8px">
-          <button onclick="saveOtPlan()" style="flex:1;background:#238636;border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-weight:700">保存</button>
-          <button onclick="document.getElementById('lp-plan-modal').style.display='none'" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px;border-radius:8px;cursor:pointer">キャンセル</button>
-        </div>
-      </div>
     </div>`;
+}
 
-  // Set up time preview update（バリデーション＋昼休憩除外・切り上げ）
+// 時間プレビュー更新（静的モーダル用・openAddLeaveから呼ぶ）
+function _setupLeaveTimePreview(){
   const stEl=document.getElementById('lp-lv-st');
   const enEl=document.getElementById('lp-lv-en');
-  if(stEl&&enEl){
-    const ERR_BORDER='#f85149', OK_BORDER='#30363d';
+  if(!stEl||!enEl) return;
+  const ERR_BORDER='#f85149', OK_BORDER='#30363d';
+  if(stEl._previewBound) return; // 重複登録防止
+  stEl._previewBound=true;
+  {const ERR_BORDER2=ERR_BORDER, OK_BORDER2=OK_BORDER;
     const updatePreview=()=>{
       const s=stEl.value, e=enEl.value;
       const el=document.getElementById('lp-lv-hours-preview');
@@ -2309,6 +2349,7 @@ function openAddLeave(empId, ds=''){
   const enEl=document.getElementById('lp-lv-en');
   if(stEl) stEl.value='08:30';
   if(enEl) enEl.value='09:30';
+  _setupLeaveTimePreview(); // 時間プレビュー初期化（静的モーダル用）
   // プレビューリセット
   const prev=document.getElementById('lp-lv-hours-preview');
   if(prev){ prev.textContent='→ 1時間の有休（60分間）'; prev.style.color='#79c0ff'; }
@@ -2365,7 +2406,7 @@ async function saveLeave(){
   document.getElementById('lp-leave-modal').style.display='none';
   try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🌴 有休を登録しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
-  renderLpContent(_lpCurEmpId);
+  _refreshAfterReg();
 }
 
 async function deleteLeave(empId, date){
@@ -2374,6 +2415,26 @@ async function deleteLeave(empId, date){
   try{ await saveKSheet('有休管理',KC.leaves.map(l=>[l.id,l.ym,l.date,l.type,l.memo])); toast('🗑 削除しました'); }
   catch(e){ alert('削除エラー: '+e.message); }
   renderLpContent(empId);
+}
+
+// ── 残業管理ページからの登録ボタン ──────────────────────────────
+// 保存後に現在のページ（残業管理 or 有休・残業予定）を更新
+function _refreshAfterReg(){
+  const otActive=document.getElementById('page-overtime')?.classList.contains('active');
+  if(otActive) renderOvertimePage();
+  else renderLpContent(_lpCurEmpId);
+}
+function quickRegLeave(empId){
+  _lpCurEmpId=empId;
+  openAddLeave(empId);
+}
+function quickRegOtPlan(empId){
+  _lpCurEmpId=empId;
+  openAddOtPlanDirect(empId);
+}
+function quickRegVacation(empId){
+  _lpCurEmpId=empId;
+  openAddVacation(empId);
 }
 
 function openAddOtPlanDirect(empId){
@@ -2411,7 +2472,7 @@ async function saveOtPlan(){
   document.getElementById('lp-plan-modal').style.display='none';
   try{ await saveKSheet('残業予定',KC.otPlans.map(l=>[l.id,l.ym,l.date,l.hours,l.memo,l.earlyH||0])); toast('📋 残業予定を登録しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
-  renderLpContent(_lpCurEmpId);
+  _refreshAfterReg();
 }
 
 async function deleteOtPlan(empId,ym,date){
@@ -2478,7 +2539,7 @@ async function saveVacation(){
   document.getElementById('lp-vac-modal').style.display='none';
   try{ await saveKSheet('休暇管理',KC.vacations.map(v=>[v.id,v.startDate,v.endDate,v.reason,v.memo])); toast('🏖 休暇を登録しました'); }
   catch(e){ alert('保存エラー: '+e.message); }
-  renderLpContent(_lpCurEmpId);
+  _refreshAfterReg();
 }
 
 async function deleteVacation(empId,startDate,endDate){
