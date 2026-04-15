@@ -1426,19 +1426,36 @@ async function renderOvertimePage() {
         </div>
       </div>`;
   } else {
-    // グループ選択時: チャート | 登録ボタンリスト + テーブル
+    // グループ選択時: 1カードで「名前｜バー｜h｜登録ボタン」を横一行に表示（スクロールなし）
+    const regList=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
+    const limitH2=MC.otLimit||45;
+    const maxOtH2=Math.max(...regList.map(e=>e.otM/60),limitH2,0.1);
+    const combinedRows=regList.map(e=>{
+      const h=parseFloat((e.otM/60).toFixed(1));
+      const pct=Math.min(h/maxOtH2*100,100);
+      const limitPct=Math.min(limitH2/maxOtH2*100,100);
+      const color=e.otM>=otLimit?'#f85149':e.otM>=otLimit*.8?'#d29922':'#3fb950';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #1c2128">
+        <div style="width:90px;text-align:right;font-size:12px;color:#cdd9e5;flex-shrink:0;white-space:nowrap">${e.name}</div>
+        <div style="flex:1;position:relative;height:18px;background:#21262d;border-radius:3px;min-width:60px">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .3s"></div>
+          <div style="position:absolute;left:${limitPct}%;top:-3px;height:24px;width:1px;background:rgba(255,255,255,.3)"></div>
+        </div>
+        <div style="width:36px;text-align:right;font-size:12px;color:#8b949e;flex-shrink:0">${h}h</div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button onclick="quickRegLeave('${e.id}')"
+            style="background:#1a3a2a;border:1px solid #27ae60;color:#3fb950;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🌴 有休登録</button>
+          <button onclick="quickRegOtPlan('${e.id}')"
+            style="background:#1a2a1a;border:1px solid #d29922;color:#d29922;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">📋 残業登録</button>
+          <button onclick="quickRegVacation('${e.id}')"
+            style="background:#2a1040;border:1px solid #9b59b6;color:#d0a0ff;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🏖 休暇登録</button>
+        </div>
+      </div>`;
+    }).join('');
     document.getElementById('ot-main-section').innerHTML=`
-      <div class="card-row cols-2" style="margin-bottom:0">
-        <div class="chart-card" id="rank-card">
-          <h3>残業時間（時間）</h3>
-          <div id="rank-chart" style="margin-top:8px"></div>
-        </div>
-        <div class="tbl-card" style="max-height:340px;display:flex;flex-direction:column">
-          <div class="tbl-hdr"><h3>📝 ${otGroupFilter} - 有休・休暇・残業 登録</h3></div>
-          <div id="ot-emp-reg-list" style="overflow-y:auto;flex:1;padding:4px 0">
-            <div style="text-align:center;padding:20px;color:#8b949e">読み込み中...</div>
-          </div>
-        </div>
+      <div class="tbl-card" style="margin-top:4px">
+        <div class="tbl-hdr"><h3>残業時間（時間）・有休/休暇/残業 登録（${otGroupFilter}）</h3></div>
+        ${combinedRows||'<div style="text-align:center;padding:20px;color:#8b949e">データなし</div>'}
       </div>
       <div class="tbl-card" style="margin-top:12px">
         <div class="tbl-hdr"><h3>全員の残業詳細（${otGroupFilter}）</h3></div>
@@ -1446,20 +1463,6 @@ async function renderOvertimePage() {
           <table class="tbl">${TH}<tbody id="ot-detail-tbody"></tbody></table>
         </div>
       </div>`;
-    // 登録ボタン描画（フィルタ済みを社員ID順に）
-    const regList=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
-    document.getElementById('ot-emp-reg-list').innerHTML=regList.length
-      ?regList.map(e=>`
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid #1c2128;flex-wrap:wrap">
-          <div style="min-width:80px;font-size:12px;font-weight:700;color:#cdd9e5;white-space:nowrap">${e.name}</div>
-          <button onclick="quickRegLeave('${e.id}')"
-            style="background:#1a3a2a;border:1px solid #27ae60;color:#3fb950;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🌴 有休登録</button>
-          <button onclick="quickRegOtPlan('${e.id}')"
-            style="background:#1a2a1a;border:1px solid #d29922;color:#d29922;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">📋 残業登録</button>
-          <button onclick="quickRegVacation('${e.id}')"
-            style="background:#2a1040;border:1px solid #9b59b6;color:#d0a0ff;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🏖 休暇登録</button>
-        </div>`).join('')
-      :'<div style="text-align:center;padding:20px;color:#8b949e">社員データなし</div>';
   }
 
   // 全員詳細（残業時間（時間）チャートと同じ社員ID順）
@@ -1509,7 +1512,9 @@ async function renderOvertimePage() {
       <div style="width:36px;text-align:right;font-size:12px;color:#8b949e;flex-shrink:0">${h}h</div>
     </div>`;
   }).join('');
-  document.getElementById('rank-chart').innerHTML = rankRows ||
+  // 全員モード時のみ rank-chart を描画（グループモードは各行にインライン描画済み）
+  const rankChartEl=document.getElementById('rank-chart');
+  if(rankChartEl) rankChartEl.innerHTML = rankRows ||
     '<div style="text-align:center;padding:20px;color:#6e7681;font-size:12px">データなし</div>';
 }
 function changeOtPeriod(delta) {
