@@ -1008,10 +1008,11 @@ async function loadKC() {
     catch{ return []; }
   };
   const [cal,lv,op,vac]=await Promise.all([load('会社カレンダー'),load('有休管理'),load('残業予定'),load('休暇管理')]);
-  KC.calendar=cal.map(r=>({date:String(r[0]),type:String(r[1]||''),memo:String(r[2]||'')}));
-  KC.leaves=lv.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:String(r[2]),type:String(r[3]||''),memo:String(r[4]||'')}));
-  KC.otPlans=op.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:String(r[2]),hours:parseFloat(r[3])||0,memo:String(r[4]||''),earlyH:parseFloat(r[5])||0}));
-  KC.vacations=vac.map(r=>({id:String(r[0]).padStart(4,'0'),startDate:String(r[1]),endDate:String(r[2]),reason:String(r[3]||''),memo:String(r[4]||'')}));
+  const d2s=excelSerialToDateStr; // 日付変換ヘルパー（数値シリアル値 or 文字列どちらも対応）
+  KC.calendar=cal.map(r=>({date:d2s(r[0]),type:String(r[1]||''),memo:String(r[2]||'')}));
+  KC.leaves=lv.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:d2s(r[2]),type:String(r[3]||''),memo:String(r[4]||'')}));
+  KC.otPlans=op.map(r=>({id:String(r[0]).padStart(4,'0'),ym:String(r[1]),date:d2s(r[2]),hours:parseFloat(r[3])||0,memo:String(r[4]||''),earlyH:parseFloat(r[5])||0}));
+  KC.vacations=vac.map(r=>({id:String(r[0]).padStart(4,'0'),startDate:d2s(r[1]),endDate:d2s(r[2]),reason:String(r[3]||''),memo:String(r[4]||'')}));
   KC.loaded=true;
 }
 
