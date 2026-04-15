@@ -342,15 +342,14 @@
 
         <!-- ===== Dashboard ===== -->
         <div class="page active" id="page-dashboard">
-          <!-- サマリーカード（3枚） -->
-          <div class="card-row cols-3" id="dash-cards">
+          <!-- サマリーカード＋チャートを同一グリッドに配置（グループ別＝出勤人数と同幅を保証） -->
+          <div id="dash-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
+            <!-- 行1: サマリーカード -->
             <div class="card"><h3>本日の出勤</h3><div class="card-val c-blue" id="d-today">—</div><div class="card-sub" id="d-today-sub">—</div></div>
             <div class="card"><h3>今月の残業合計</h3><div class="card-val c-yellow" id="d-ot-total">—</div><div class="card-sub" id="d-ot-sub">—</div></div>
             <div class="card"><h3>出勤人数（直近稼働3日）</h3><div id="d-headcount-list" style="margin-top:4px"></div></div>
-          </div>
-          <!-- チャート -->
-          <div class="card-row" style="grid-template-columns:2fr minmax(0,1fr)">
-            <div class="chart-card">
+            <!-- 行2: チャート（月次が2列span、グループ別が出勤人数列と完全一致） -->
+            <div class="chart-card" style="grid-column:1 / span 2">
               <h3>月次残業時間推移（当期12ヶ月・合計）</h3>
               <div class="chart-wrap" style="height:210px"><canvas id="ch-trend"></canvas></div>
             </div>
