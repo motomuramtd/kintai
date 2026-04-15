@@ -411,21 +411,12 @@
             <div class="card"><h3>総残業時間</h3><div class="card-val c-yellow" id="ot-sum">—</div><div class="card-sub" id="ot-avg">—</div></div>
             <div class="card"><h3>上限超過</h3><div class="card-val c-red" id="ot-over">—<span style="font-size:14px;color:#8b949e"> 名</span></div><div class="card-sub" id="ot-limit-label"></div></div>
           </div>
-          <div class="card-row cols-2">
-            <div class="chart-card" id="rank-card">
-              <h3>残業時間（時間）</h3>
-              <div id="rank-chart" style="margin-top:8px"></div>
+          <div class="tbl-card" style="margin-top:4px">
+            <div class="tbl-hdr">
+              <h3>残業時間（時間）・全員の残業詳細</h3>
             </div>
-            <div class="tbl-card" style="max-height:340px;display:flex;flex-direction:column">
-              <div class="tbl-hdr"><h3>📝 有休・休暇・残業 登録</h3></div>
-              <div id="ot-emp-reg-list" style="overflow-y:auto;flex:1;padding:4px 0">
-                <div style="text-align:center;padding:20px;color:#8b949e">読み込み中...</div>
-              </div>
-            </div>
-          </div>
-          <div class="tbl-card" style="margin-top:18px">
-            <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
-            <div style="overflow-x:auto">
+            <div id="rank-chart" style="margin:8px 16px 16px"></div>
+            <div style="overflow-x:auto;border-top:1px solid #21262d">
               <table class="tbl">
                 <thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r" style="color:#ff8040">休日出勤</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>
                 <tbody id="ot-detail-tbody"></tbody>
@@ -1432,22 +1423,6 @@ async function renderOvertimePage() {
   document.getElementById('ot-sum').textContent=m2hm(totalOt);
   document.getElementById('ot-avg').textContent=`平均 ${m2hm(Math.round(totalOt/filteredStats.length))} / 人`;
   document.getElementById('ot-over').textContent=overCnt;
-
-  // ── 有休・休暇・残業 登録ボタンリスト（残業時間チャートと同じ社員ID順）──
-  const regList=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
-  document.getElementById('ot-emp-reg-list').innerHTML=regList.length
-    ?regList.map(e=>`
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid #1c2128;flex-wrap:wrap">
-        <div style="min-width:80px;font-size:12px;font-weight:700;color:#cdd9e5;white-space:nowrap">${e.name}</div>
-        <span class="gbadge" style="font-size:10px">${e.group||'—'}</span>
-        <button onclick="quickRegLeave('${e.id}')"
-          style="background:#1a3a2a;border:1px solid #27ae60;color:#3fb950;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🌴 有休登録</button>
-        <button onclick="quickRegOtPlan('${e.id}')"
-          style="background:#1a2a1a;border:1px solid #d29922;color:#d29922;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">📋 残業登録</button>
-        <button onclick="quickRegVacation('${e.id}')"
-          style="background:#2a1040;border:1px solid #9b59b6;color:#d0a0ff;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">🏖 休暇登録</button>
-      </div>`).join('')
-    :'<div style="text-align:center;padding:20px;color:#8b949e">社員データなし</div>';
 
   // 全員詳細（残業時間（時間）チャートと同じ社員ID順）
   const sorted=[...filteredStats].sort((a,b)=>a.id.localeCompare(b.id));
