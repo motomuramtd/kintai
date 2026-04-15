@@ -119,8 +119,8 @@
 
     /* ===== OT progress bar ===== */
     .ot-wrap{display:flex;align-items:center;gap:8px}
-    .ot-bar{flex:0 0 100px;height:5px;background:#21262d;border-radius:3px;overflow:hidden}
-    .ot-fill{height:100%;border-radius:3px}.ot-ok{background:#3fb950}.ot-warn{background:#d29922}.ot-danger{background:#f85149}
+    .ot-bar{flex:0 0 200px;height:12px;background:#21262d;border-radius:4px;overflow:hidden}
+    .ot-fill{height:100%;border-radius:4px}.ot-ok{background:#3fb950}.ot-warn{background:#d29922}.ot-danger{background:#f85149}
 
     /* ===== View toggle (個人詳細) ===== */
     .ind-view-btn{padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#8b949e;font-weight:600;transition:all .1s}
@@ -1416,12 +1416,11 @@ async function renderOvertimePage() {
   // ── メインセクション HTML をフィルターに応じて切り替え ──
   const TH=`<thead><tr><th>社員ID</th><th>氏名</th><th>G</th><th style="color:#a78bfa">シフト</th><th class="r">出勤日</th><th class="r" style="color:#ff8040">休日出勤</th><th class="r">実働時間</th><th class="r" style="color:#f39c12">外出</th><th class="r" style="color:#58a6ff">早出</th><th class="r" style="color:#d29922">残業</th><th class="r" style="color:#e67e22">早退</th><th class="r">合計</th><th>進捗</th><th>状況</th></tr></thead>`;
   if(!otGroupFilter){
-    // 「全員」: チャート＋テーブル 統合カード
+    // 「全員」: グラフなし・テーブルのみ
     document.getElementById('ot-main-section').innerHTML=`
       <div class="tbl-card" style="margin-top:4px">
-        <div class="tbl-hdr"><h3>残業時間（時間）・全員の残業詳細</h3></div>
-        <div id="rank-chart" style="margin:8px 16px 16px"></div>
-        <div style="overflow-x:auto;border-top:1px solid #21262d">
+        <div class="tbl-hdr"><h3>全員の残業詳細</h3></div>
+        <div style="overflow-x:auto">
           <table class="tbl">${TH}<tbody id="ot-detail-tbody"></tbody></table>
         </div>
       </div>`;
@@ -1512,10 +1511,8 @@ async function renderOvertimePage() {
       <div style="width:36px;text-align:right;font-size:12px;color:#8b949e;flex-shrink:0">${h}h</div>
     </div>`;
   }).join('');
-  // 全員モード時のみ rank-chart を描画（グループモードは各行にインライン描画済み）
-  const rankChartEl=document.getElementById('rank-chart');
-  if(rankChartEl) rankChartEl.innerHTML = rankRows ||
-    '<div style="text-align:center;padding:20px;color:#6e7681;font-size:12px">データなし</div>';
+  // グループ選択時のみ rank-chart を描画（全員モードはグラフ非表示）
+  // ※ rankRows はグループモードでは使用しないが変数として保持
 }
 function changeOtPeriod(delta) {
   otPIdx+=delta;
