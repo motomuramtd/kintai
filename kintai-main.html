@@ -133,6 +133,8 @@
     .ot-cal-cell.ot-cal-has-data{background:#1a2a1a;border-color:#27ae60}
     .ot-cal-cell.ot-cal-kakutei{background:#2a1a00;border-color:#d29922;box-shadow:0 0 6px rgba(210,153,34,.3)}
     .ot-cal-cell.ot-cal-zero{background:#1a2030;border-color:#2a4060;opacity:.8}
+    .ot-cal-cell.ot-cal-locked{cursor:not-allowed !important;opacity:.75}
+    .ot-cal-cell.ot-cal-locked input{pointer-events:none;color:#6e7681}
     .ot-cal-day-num{font-size:15px;font-weight:700;line-height:1;width:100%;text-align:center}
     .ot-cal-inp{width:100%;background:transparent;border:none;border-bottom:1px solid #30363d;color:#e6edf3;font-size:14px;text-align:center;outline:none;padding:2px 0;-moz-appearance:textfield}
     .ot-cal-inp::-webkit-outer-spin-button,.ot-cal-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -2610,31 +2612,37 @@ function renderOtCalModal(){
       const isTouched=_otCalTouched.has(ds);
       const kb=_otCalKubunMap[ds]||'予定';
       const isKakutei=kb==='確定';
-      const cellCls=`ot-cal-cell${isToday?' ot-cal-today':''}${hasVal?(isKakutei?' ot-cal-kakutei':' ot-cal-has-data'):(isTouched?' ot-cal-zero':'')}`;
       const active=hasVal||isTouched;
       // 実績データ取得（打刻がある場合）
       const empObj=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
       const logs=dayRecs(ds,_otCalEmpId);
       const st=logs&&logs.length?calcDay(logs,empObj):null;
+      // 出勤打刻済みの日はロック（区分トグル・入力不可）
+      const isLocked=!!(st&&st.inT);
       const earlyAct=st&&st.inT!=null?st.earlyM:null;  // 出勤打刻があれば早出実績
       const otAct=st&&st.outT!=null?st.lateM:null;     // 退勤打刻があれば残業実績
-      const earlyActStr=earlyAct!=null?`<span style="font-size:9px;color:#27ae60;flex-shrink:0;white-space:nowrap">${(earlyAct/60).toFixed(1)}h</span>`:'';
-      const otActStr=otAct!=null?`<span style="font-size:9px;color:#3fb950;flex-shrink:0;white-space:nowrap">${(otAct/60).toFixed(1)}h</span>`:'';
-      html+=`<div id="ot-cell-${ds}" class="${cellCls}" style="cursor:pointer" onclick="if(event.target.tagName!=='INPUT')toggleCellKubun('${ds}')">
-        <div class="ot-cal-day-num" style="color:${numColor};font-size:${numSize}">${label}</div>
-        <div id="ot-kb-${ds}" style="font-size:9px;font-weight:700;line-height:1.2;min-height:11px;color:${active?(isKakutei?'#d29922':'#27ae60'):'transparent'}">${active?kb:''}</div>
+      const cellCls=`ot-cal-cell${isToday?' ot-cal-today':''}${isLocked?' ot-cal-locked':''}${!isLocked&&hasVal?(isKakutei?' ot-cal-kakutei':' ot-cal-has-data'):(!isLocked&&isTouched?' ot-cal-zero':'')}`;
+      const earlyActStr=earlyAct!=null?`<span id="ot-act-e-${ds}" style="font-size:9px;color:#27ae60;flex-shrink:0;white-space:nowrap">${(earlyAct/60).toFixed(2)}h</span>`:`<span id="ot-act-e-${ds}" style="font-size:9px;color:#27ae60;flex-shrink:0;white-space:nowrap"></span>`;
+      const otActStr=otAct!=null?`<span id="ot-act-o-${ds}" style="font-size:9px;color:#3fb950;flex-shrink:0;white-space:nowrap">${(otAct/60).toFixed(2)}h</span>`:`<span id="ot-act-o-${ds}" style="font-size:9px;color:#3fb950;flex-shrink:0;white-space:nowrap"></span>`;
+      // ロック時: 実績値をそのまま表示、入力disabled
+      const lockAttr=isLocked?'disabled readonly':'' ;
+      const lockTitle=isLocked?' title="出勤打刻済みのため変更不可"':'';
+      html+=`<div id="ot-cell-${ds}" class="${cellCls}" style="cursor:${isLocked?'not-allowed':'pointer'}"${lockTitle}
+          onclick="if(!${isLocked}&&event.target.tagName!=='INPUT')toggleCellKubun('${ds}')">
+        <div class="ot-cal-day-num" style="color:${numColor};font-size:${numSize}">${label}${isLocked?' 🔒':''}</div>
+        <div id="ot-kb-${ds}" style="font-size:9px;font-weight:700;line-height:1.2;min-height:11px;color:${isLocked?'#6e7681':(active?(isKakutei?'#d29922':'#27ae60'):'transparent')}">${isLocked?(kb||'予定'):(active?kb:'')}</div>
         <div style="display:flex;align-items:center;gap:2px;width:100%">
           <span style="font-size:9px;color:#58a6ff;flex-shrink:0">早</span>
           <input type="number" id="ot-inp-early-${ds}" class="ot-cal-inp early${ex&&ex.earlyH>0?' has-val':''}" style="flex:1;min-width:0"
             placeholder="0" step="any" min="0" max="4" value="${ex&&ex.earlyH>0?ex.earlyH:''}"
-            oninput="otCalHighlight(this,'${ds}')" onkeydown="earlyKeyStep(this,event,'${ds}')">
+            oninput="otCalHighlight(this,'${ds}')" onkeydown="earlyKeyStep(this,event,'${ds}')" ${lockAttr}>
           ${earlyActStr}
         </div>
         <div style="display:flex;align-items:center;gap:2px;width:100%">
           <span style="font-size:9px;color:#d29922;flex-shrink:0">残</span>
           <input type="number" id="ot-inp-ot-${ds}" class="ot-cal-inp ot${ex&&ex.hours!==0&&ex.hours!=null?' has-val':''}" style="flex:1;min-width:0"
             placeholder="0" step="0.25" min="-8" max="8" value="${ex&&ex.hours!=null&&ex.hours!==0?ex.hours:''}"
-            oninput="otCalHighlight(this,'${ds}')">
+            oninput="otCalHighlight(this,'${ds}')" ${lockAttr}>
           ${otActStr}
         </div>
       </div>`;
@@ -2663,11 +2671,16 @@ function earlyKeyStep(el, event, ds){
   } else {
     next= cur<=1 ? 0 : Math.max(0, Math.round((cur-0.25)*100)/100);
   }
-  el.value= next>0 ? next : '';
+  el.value= next>0 ? next : 0;
   otCalHighlight(el, ds);
 }
 
 function toggleCellKubun(ds){
+  // 出勤打刻済みの日はトグル不可
+  const _empLk=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
+  const _logsLk=dayRecs(ds,_otCalEmpId);
+  const _stLk=_logsLk&&_logsLk.length?calcDay(_logsLk,_empLk):null;
+  if(_stLk&&_stLk.inT) return; // 🔒 出勤打刻あり → 変更不可
   const earlyEl=document.getElementById(`ot-inp-early-${ds}`);
   const otEl=document.getElementById(`ot-inp-ot-${ds}`);
   const hasData=(earlyEl?.value!==''&&earlyEl?.value!=null)||(otEl?.value!==''&&otEl?.value!=null);
@@ -2676,24 +2689,31 @@ function toggleCellKubun(ds){
   _otCalKubunMap[ds]=newKubun;
   // 確定に切り替えた時: 打刻の実績値を予定欄に上書き（予定＝実際の時間）
   if(newKubun==='確定'){
-    const empObj=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
-    const logs=dayRecs(ds,_otCalEmpId);
-    const st=logs&&logs.length?calcDay(logs,empObj):null;
-    if(st){
-      // 早出: 出勤打刻があれば実績をセット（0も含む）
-      if(earlyEl&&st.earlyM!==undefined&&st.earlyM!==null){
-        const v=+(st.earlyM/60).toFixed(2);
-        earlyEl.value=v;           // 実際の早出時間を予定欄へ（0もそのまま表示）
+    const empObj2=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
+    const logs2=dayRecs(ds,_otCalEmpId);
+    const st2=logs2&&logs2.length?calcDay(logs2,empObj2):null;
+    // 実績スパン要素を取得
+    const earlyActEl=document.getElementById(`ot-act-e-${ds}`);
+    const otActEl=document.getElementById(`ot-act-o-${ds}`);
+    if(st2){
+      // 早出: 出勤打刻があれば実績をセット＋実績スパンを更新
+      if(st2.earlyM!==undefined&&st2.earlyM!==null){
+        const v=+(st2.earlyM/60).toFixed(2);
+        if(earlyEl){ earlyEl.value=v; earlyEl.classList.toggle('has-val',v>0); }
+        if(earlyActEl) earlyActEl.textContent=`${v.toFixed(2)}h`; // 実績表示を更新
         _otCalTouched.add(ds);
-        earlyEl.classList.toggle('has-val', v>0);
       }
-      // 残業: 退勤打刻があれば実績をセット（0・マイナスも含む）
-      if(otEl&&st.lateM!==undefined&&st.lateM!==null){
-        const v=+(st.lateM/60).toFixed(2);
-        otEl.value=v;              // 実際の残業時間を予定欄へ
+      // 残業: 退勤打刻があれば実績をセット＋実績スパンを更新
+      if(st2.lateM!==undefined&&st2.lateM!==null){
+        const v=+(st2.lateM/60).toFixed(2);
+        if(otEl){ otEl.value=v; otEl.classList.toggle('has-val',v!==0); }
+        if(otActEl) otActEl.textContent=`${v.toFixed(2)}h`; // 実績表示を更新
         _otCalTouched.add(ds);
-        otEl.classList.toggle('has-val', v!==0);
       }
+    } else {
+      // 打刻データなし: 実績スパンは空のまま
+      if(earlyActEl) earlyActEl.textContent='';
+      if(otActEl) otActEl.textContent='';
     }
   }
   _updateCellStyle(ds);
