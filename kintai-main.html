@@ -2622,11 +2622,11 @@ function renderOtCalModal(){
       const earlyAct=st&&st.inT!=null?st.earlyM:null;  // 打刻からの早出実績
       const otAct=st&&st.outT!=null?st.lateM:null;     // 打刻からの残業実績
       const cellCls=`ot-cal-cell${isToday?' ot-cal-today':''}${isLocked?' ot-cal-locked':''}${!isLocked&&hasVal?(isKakutei?' ot-cal-kakutei':' ot-cal-has-data'):(!isLocked&&isTouched?' ot-cal-zero':'')}`;
-      // 実績表示: 打刻あり→打刻値、確定かつ打刻なし→入力値（0は非表示）、予定→空
+      // 実績表示: 打刻あり→打刻値、確定かつ打刻なし→入力値（0も0.00hで表示）、予定→空
       const earlyActVal=earlyAct!=null?(earlyAct/60).toFixed(2)
-                        :(isKakutei&&ex&&ex.earlyH!=null&&parseFloat(ex.earlyH)>0?parseFloat(ex.earlyH).toFixed(2):null);
+                        :(isKakutei&&ex&&ex.earlyH!=null?parseFloat(ex.earlyH).toFixed(2):null);
       const otActVal=otAct!=null?(otAct/60).toFixed(2)
-                     :(isKakutei&&ex&&ex.hours!=null&&parseFloat(ex.hours)!==0?parseFloat(ex.hours).toFixed(2):null);
+                     :(isKakutei&&ex&&ex.hours!=null?parseFloat(ex.hours).toFixed(2):null);
       const earlyActStr=`<span id="ot-act-e-${ds}" style="font-size:9px;color:#27ae60;flex-shrink:0;white-space:nowrap">${earlyActVal!=null?earlyActVal+'h':''}</span>`;
       const otActStr=`<span id="ot-act-o-${ds}" style="font-size:9px;color:#3fb950;flex-shrink:0;white-space:nowrap">${otActVal!=null?otActVal+'h':''}</span>`;
       // ロック時: 実績値をそのまま表示、入力disabled
@@ -2720,8 +2720,8 @@ function toggleCellKubun(ds){
       if(newKubun==='確定'){
         const earlyV=earlyEl?parseFloat(earlyEl.value):NaN;
         const otV=otEl?parseFloat(otEl.value):NaN;
-        if(earlyActEl) earlyActEl.textContent=(!isNaN(earlyV)&&earlyEl.value!==''&&earlyV>0)?`${earlyV.toFixed(2)}h`:'';
-        if(otActEl) otActEl.textContent=(!isNaN(otV)&&otEl.value!==''&&otV!==0)?`${otV.toFixed(2)}h`:'';
+        if(earlyActEl) earlyActEl.textContent=(!isNaN(earlyV)&&earlyEl.value!=='')?`${earlyV.toFixed(2)}h`:'';
+        if(otActEl) otActEl.textContent=(!isNaN(otV)&&otEl.value!=='')?`${otV.toFixed(2)}h`:'';
       } else {
         // 予定に戻した場合はスパンをクリア
         if(earlyActEl) earlyActEl.textContent='';
