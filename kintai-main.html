@@ -2692,42 +2692,37 @@ function toggleCellKubun(ds){
   if(!hasData&&!_otCalTouched.has(ds)) return; // 未入力の日はトグル不可
   const newKubun=(_otCalKubunMap[ds]||'予定')==='予定'?'確定':'予定';
   _otCalKubunMap[ds]=newKubun;
-  // 確定に切り替えた時: 打刻の実績値を予定欄に上書き（予定＝実際の時間）
+  const earlyActEl=document.getElementById(`ot-act-e-${ds}`);
+  const otActEl=document.getElementById(`ot-act-o-${ds}`);
   if(newKubun==='確定'){
+    // 確定に切り替え: 打刻データがあれば実績値を、なければ入力値を実績スパンに表示
     const empObj2=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===_otCalEmpId);
     const logs2=dayRecs(ds,_otCalEmpId);
     const st2=logs2&&logs2.length?calcDay(logs2,empObj2):null;
-    // 実績スパン要素を取得
-    const earlyActEl=document.getElementById(`ot-act-e-${ds}`);
-    const otActEl=document.getElementById(`ot-act-o-${ds}`);
     if(st2){
-      // 早出: 出勤打刻があれば実績をセット＋実績スパンを更新
       if(st2.earlyM!==undefined&&st2.earlyM!==null){
         const v=+(st2.earlyM/60).toFixed(2);
         if(earlyEl){ earlyEl.value=v; earlyEl.classList.toggle('has-val',v>0); }
-        if(earlyActEl) earlyActEl.textContent=`${v.toFixed(2)}h`; // 実績表示を更新
+        if(earlyActEl) earlyActEl.textContent=`${v.toFixed(2)}h`;
         _otCalTouched.add(ds);
       }
-      // 残業: 退勤打刻があれば実績をセット＋実績スパンを更新
       if(st2.lateM!==undefined&&st2.lateM!==null){
         const v=+(st2.lateM/60).toFixed(2);
         if(otEl){ otEl.value=v; otEl.classList.toggle('has-val',v!==0); }
-        if(otActEl) otActEl.textContent=`${v.toFixed(2)}h`; // 実績表示を更新
+        if(otActEl) otActEl.textContent=`${v.toFixed(2)}h`;
         _otCalTouched.add(ds);
       }
     } else {
-      // 打刻データなし: 確定に切り替えた場合は入力値を実績スパンに反映
-      if(newKubun==='確定'){
-        const earlyV=earlyEl?parseFloat(earlyEl.value):NaN;
-        const otV=otEl?parseFloat(otEl.value):NaN;
-        if(earlyActEl) earlyActEl.textContent=(!isNaN(earlyV)&&earlyEl.value!=='')?`${earlyV.toFixed(2)}h`:'';
-        if(otActEl) otActEl.textContent=(!isNaN(otV)&&otEl.value!=='')?`${otV.toFixed(2)}h`:'';
-      } else {
-        // 予定に戻した場合はスパンをクリア
-        if(earlyActEl) earlyActEl.textContent='';
-        if(otActEl) otActEl.textContent='';
-      }
+      // 打刻データなし: 入力値をそのまま実績スパンに反映（0も0.00hで表示）
+      const earlyV=earlyEl?parseFloat(earlyEl.value):NaN;
+      const otV=otEl?parseFloat(otEl.value):NaN;
+      if(earlyActEl) earlyActEl.textContent=(!isNaN(earlyV)&&earlyEl.value!=='')?`${earlyV.toFixed(2)}h`:'';
+      if(otActEl) otActEl.textContent=(!isNaN(otV)&&otEl.value!=='')?`${otV.toFixed(2)}h`:'';
     }
+  } else {
+    // 予定に戻した場合: 実績スパンをすべてクリア
+    if(earlyActEl) earlyActEl.textContent='';
+    if(otActEl) otActEl.textContent='';
   }
   _updateCellStyle(ds);
 }
